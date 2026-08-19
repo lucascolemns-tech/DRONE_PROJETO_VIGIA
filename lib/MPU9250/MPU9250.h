@@ -123,8 +123,6 @@ private:
         float pos_x = 0.0;
         float pos_y = 0.0;
         float pos_z = 0.0;
-
-     
     };
 
 #endif  
