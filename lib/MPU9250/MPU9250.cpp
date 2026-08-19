@@ -1,9 +1,5 @@
 #include "MPU9250.h"
 
-const double pi = 3.1415926535;
-
-float Time_ = 0.0;
-
 uint8_t MPU9250::lerRegistrador(uint8_t endereco) 
 {
     digitalWrite(CS_MPU, LOW);
@@ -68,8 +64,6 @@ void MPU9250::lerAcelerometroGiroscopio()
             case 0x47: GYRO_Z_H =  valor; break;
             case 0x48: GYRO_Z_L =  valor; break;
         }
-
-    digitalWrite(CS_MPU, HIGH);
     }
 
     //construir os valores de 16 bits a partir dos registradores de 8 bits
@@ -89,7 +83,7 @@ void MPU9250::lerAcelerometroGiroscopio()
 void MPU9250::lerMagnetometro()
 {
     //checar estado de partida a partir do primeiro bit do registrador ST1 do magnetometro
-    if (!lerRegistradorI2C(AK8963_ADDRESS, MAG_ST1) & 0x01) 
+     if ((lerRegistradorI2C(AK8963_ADDRESS, MAG_ST1) & 0x01) == 0)
         return;
 
     Wire.beginTransmission(AK8963_ADDRESS);
@@ -98,9 +92,9 @@ void MPU9250::lerMagnetometro()
 
     Wire.endTransmission(false);
     
-    Wire.requestFrom(AK8963_ADDRESS, 6);
+    Wire.requestFrom(AK8963_ADDRESS, 7);
 
-    if (Wire.available() < 6)
+    if (Wire.available() < 7)
         return;
 
     mx_L = Wire.read();
@@ -110,11 +104,14 @@ void MPU9250::lerMagnetometro()
     mz_L = Wire.read();
     mz_H = Wire.read();
 
-    mx = mx_H | (mx_H<< 8); 
-    my = my_H | (my_H << 8);
-    mz = mz_H | (mz_H << 8);
- 
-    Wire.endTransmission();
+    ST2 = Wire.read();  
+
+    if (ST2 & 0x08)
+        return;
+
+    mx = mx_L | (mx_H<< 8); 
+    my = my_L | (my_H << 8);
+    mz = mz_L | (mz_H << 8);
 }
 
 bool MPU9250::inicializar() 
@@ -128,22 +125,15 @@ bool MPU9250::inicializar()
     if (lerRegistrador(WHO_AM_I_MPU) != MPU_ID)
         return false;
 
+    //tirar do modo sleep
+    escreverRegistrador(PWR_MGMT_1, 0x00);
+  
     //acelerometro config
-    digitalWrite(CS_MPU, LOW);
-
-    SPI.transfer(ACCEL_CONFIG);
-    SPI.transfer(0x00);
-
-    digitalWrite(CS_MPU, HIGH);
+    escreverRegistrador(ACCEL_CONFIG, 0x00);
 
     //giroscopio config
-    digitalWrite(CS_MPU, LOW);
-
-    SPI.transfer(GYRO_CONFIG);
-    SPI.transfer(0x00);
-
-    digitalWrite(CS_MPU, HIGH);
-    
+    escreverRegistrador(GYRO_CONFIG, 0x00);
+        
     //I2C config
     Wire.begin();
 
@@ -151,14 +141,21 @@ bool MPU9250::inicializar()
     Wire.write(INT_PIN_CFG); 
     Wire.write(0x02); 
 
-    Wire.endTransmission();
-
     //magnetometro config
     if (lerRegistradorI2C(AK8963_ADDRESS, WHO_AM_I_AK89630) != AK8963_ID)
         return false;
 
     Wire.beginTransmission(AK8963_ADDRESS);
+
+    Wire.write(AK8963_CNTL1);
+    Wire.write(0x00);
+
+    Wire.endTransmission();
+
+    delay(10);
     
+    Wire.beginTransmission(AK8963_ADDRESS);
+
     Wire.write(AK8963_CNTL1);
     Wire.write(0x16); 
 
@@ -261,13 +258,13 @@ void MPU9250::MPUcalculos()
     roll,              pitch,             yaw, 
     ACClinear_x_World, ACClinear_y_World, ACClinear_z_World);
 
-    vel_x += ACClinear_x_World*Time_;
-    vel_y += ACClinear_y_World*Time_;
-    vel_z += ACClinear_z_World*Time_;
+    vel_x += ACClinear_x_World * tempo;
+    vel_y += ACClinear_y_World * tempo;
+    vel_z += ACClinear_z_World * tempo;
 
-    pos_x += vel_x * Time_;
-    pos_y += vel_y * Time_;
-    pos_z += vel_z * Time_;
+    pos_x += vel_x * tempo;
+    pos_y += vel_y * tempo;
+    pos_z += vel_z * tempo;
 }
 
 
