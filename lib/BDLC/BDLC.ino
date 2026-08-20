@@ -1,4 +1,4 @@
-// não podee  ser uma função que guarda posição, pos deve ter loop.
+// não podee  ser uma função que guarda posição, pois deve ter loop.
 //Vel dow e vel rise são velocidades de decida e subida do drone e com a vel liquida final é só somar a altura encotrada pelo barometro, e mpu
 unsigned long tempo_anterior = 0;
 // Velocidades
