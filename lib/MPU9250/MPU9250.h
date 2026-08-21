@@ -1,4 +1,3 @@
-//datasheet: https://www.alldatasheet.com/datasheet-pdf/pdf/1132035/TDK/MPU-9250.html
 
 //bibliotecas
 #include <Arduino.h>
@@ -45,6 +44,9 @@
 #define MAG_ST1 0x02
 #define MAG_ST2 0x09
 
+//constantes
+const double pi = 3.1415926535;
+
 class MPU9250 
 {
 public:
@@ -58,6 +60,35 @@ public:
         float ax, float ay, float az, 
         float roll, float pitch, float yaw, 
         float &world_x, float &world_y, float &world_z);
+
+         
+            //dados registradores
+            int16_t ACC_X;
+            int16_t ACC_Y;
+            int16_t ACC_Z;
+
+            int16_t GYRO_X;
+            int16_t GYRO_Y;
+            int16_t GYRO_Z;
+            
+            //calculados
+            float angle_x = 0.0;
+            float angle_y = 0.0;
+            float angle_z = 0.0;
+
+            float roll = 0.0;
+            float pitch = 0.0;
+            float yaw = 0.0;
+
+            float vel_x = 0.0;
+            float vel_y = 0.0;
+            float vel_z = 0.0;
+
+            float pos_x = 0.0;
+            float pos_y = 0.0;
+            float pos_z = 0.0;
+
+
     
 private:
     uint8_t lerRegistrador(uint8_t endereco);
@@ -86,15 +117,7 @@ private:
         byte GYRO_Z_H;
         byte GYRO_Z_L;
    
-        int16_t ACC_X;
-        int16_t ACC_Y;
-        int16_t ACC_Z;
-
         int16_t TEMP;
-
-        int16_t GYRO_X;
-        int16_t GYRO_Y;
-        int16_t GYRO_Z;
 
         int16_t mx_L;
         int16_t mx_H;
@@ -106,23 +129,8 @@ private:
         int16_t mx; 
         int16_t my;
         int16_t mz;
-
-    //calculados
-        float angle_x = 0.0;
-        float angle_y = 0.0;
-        float angle_z = 0.0;
-
-        float roll = 0.0;
-        float pitch = 0.0;
-        float yaw = 0.0;
         
-        float vel_x = 0.0;
-        float vel_y = 0.0;
-        float vel_z = 0.0;
-
-        float pos_x = 0.0;
-        float pos_y = 0.0;
-        float pos_z = 0.0;
+        uint8_t ST2;
     };
 
 #endif  
