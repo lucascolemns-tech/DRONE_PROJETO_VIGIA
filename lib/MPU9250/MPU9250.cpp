@@ -1,5 +1,9 @@
 #include "MPU9250.h"
 
+MPU9250::MPU9250()
+{
+}
+
 uint8_t MPU9250::lerRegistrador(uint8_t endereco) 
 {
     digitalWrite(CS_MPU, LOW);
@@ -122,8 +126,16 @@ bool MPU9250::inicializar()
 
     SPI.begin();
 
-    if (lerRegistrador(WHO_AM_I_MPU) != MPU_ID)
+        uint8_t id_mpu = lerRegistrador(WHO_AM_I_MPU);
+
+        Serial.print("MPU WHO_AM_I: 0x");
+        Serial.println(id_mpu, HEX);
+
+        if (id_mpu != MPU_ID)
+        {
+        Serial.println("ERRO: MPU9250 nao encontrado!");
         return false;
+        }
 
     //tirar do modo sleep
     escreverRegistrador(PWR_MGMT_1, 0x00);
@@ -141,9 +153,18 @@ bool MPU9250::inicializar()
     Wire.write(INT_PIN_CFG); 
     Wire.write(0x02); 
 
-    //magnetometro config
-    if (lerRegistradorI2C(AK8963_ADDRESS, WHO_AM_I_AK89630) != AK8963_ID)
+    Wire.endTransmission();
+
+        uint8_t id_mag = lerRegistradorI2C(AK8963_ADDRESS, WHO_AM_I_AK89630);
+
+        Serial.print("AK8963 WHO_AM_I: 0x");
+        Serial.println(id_mag, HEX);
+
+        if (id_mag != AK8963_ID)
+        {
+        Serial.println("ERRO: AK8963 nao encontrado!");
         return false;
+        }
 
     Wire.beginTransmission(AK8963_ADDRESS);
 
@@ -266,5 +287,4 @@ void MPU9250::MPUcalculos()
     pos_y += vel_y * tempo;
     pos_z += vel_z * tempo;
 }
-
 
