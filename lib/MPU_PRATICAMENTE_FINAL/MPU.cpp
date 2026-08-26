@@ -98,7 +98,6 @@ bool MPU::inicializar()
     escreverRegistrador(FILTER_CONFIG, 0x03);
     escreverRegistrador(SMPLRT_DIV, 0x00);
 
-    // Inicializa o filtro (não obrigatório, mas mantido)
     filter.begin(100.0f);
 
     return true;
