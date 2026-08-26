@@ -41,14 +41,14 @@ void loop()
 
     if (mpu.calibrado) 
     {
-      // ângulos
+      //ângulos
       Serial.print(mpu.angulo_x); Serial.print(",");
       Serial.print(mpu.angulo_y); Serial.print(",");
       Serial.print(mpu.angulo_z); Serial.print(",");
 
       Serial.print("  |  ");
 
-      // velocidade
+      //velocidade
       Serial.print(mpu.vel_x, 3); Serial.print(",");
       Serial.print(mpu.vel_y, 3); Serial.print(",");
       Serial.print(mpu.vel_z, 3); Serial.print(",");
