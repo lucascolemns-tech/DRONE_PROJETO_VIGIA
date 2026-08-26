@@ -32,7 +32,7 @@
 #define GYRO_CONFIG   0x1B
 #define GYRO_CONFIG2  0x1D
 
-// Constantes do filtro
+//constantes do filtro
 const float GAMMA = 0.4f;    // filtro exponencial para aceleração linear
 const float TETHA = 0.6f;    // limiar para detecção de movimento 
 
@@ -83,7 +83,7 @@ private:
     uint8_t lerRegistrador(uint8_t endereco);
     void escreverRegistrador(uint8_t endereco, uint8_t valor);
 
-    // Registradores internos
+    //registradores internos
     byte ACC_X_H, ACC_X_L;
     byte ACC_Y_H, ACC_Y_L;
     byte ACC_Z_H, ACC_Z_L;
