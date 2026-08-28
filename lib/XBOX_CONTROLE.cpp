@@ -3,11 +3,6 @@
 #include <iostream>    // Para usar cout
 #include <cmath>       // Para usar abs()
 
-//esta parte é somente um teste para o controle, a lógica dele
-/*procurei por estas duas bibliotecas windows.h e Xinput.h, salvam a vida na hora dos testes, pelo oq eu estava olhando
-era recomendado nos utilizarmos um controles bluetooth ao invés do USB do xbox360, muito mais simples de programar, no entanto
-isto aq é meio q uma gambiarra pra conseguir testar a lógica usando meu próprio controle.
-*/
 #pragma comment(lib, "Xinput9_1_0.lib")
 //isto aqui linka a biblioteca necessária para usar o XInput blz? 
 
@@ -16,7 +11,6 @@ a gente so pega essa parte do código e joga a desenvolve a conexão dos analogi
 com isto
 */
 #define ZONAMORTA 2500 
-
 
 int funcaonormalizar(SHORT valorBruto)
 {
