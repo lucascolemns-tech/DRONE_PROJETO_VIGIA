@@ -1,5 +1,3 @@
-//favor após checar retirar os comentários no github
-//a modularização precisa ser o mesmo nome do arquivo, da erro de compilação
 #ifndef INTERNET_ESP_CLASS_H   
 #define INTERNET_ESP_CLASS_H
 
@@ -31,44 +29,3 @@ private:
     WiFiServer server;
     WiFiClient cliente;
 };
-
-#endif
-
-/*
-COOOODIGOOOO ANTERIORRRRR:
-
-#ifndef INTERNET_H
-#define INTERNET_H
-
-#include <Arduino.h>
-#include <WiFi.h>
-
-// Configurações
-
-#define SERVER_PORT 1234
-
-extern const char* rede;
-extern const char* pass;
-
-extern WiFiServer server;
-extern WiFiClient cliente;
-
-// IP fixo
-extern IPAddress local_IP;
-extern IPAddress gateway;
-extern IPAddress subnet;
-
-// Funções
-
-void internet_init();
-
-bool internet_conectado();
-
-bool internet_novoCliente();
-
-void internet_enviar(const char* dados);
-
-String internet_receber();
-
-#endif
-*/
