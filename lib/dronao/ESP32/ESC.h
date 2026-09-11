@@ -3,7 +3,8 @@
 #define PINO_M1 12
 #define PINO_M2 13
 #define PINO_M3 14
-#define PINO_M4 15
+#define PINO_M4 15 // colocar os pinos corretos
+
 
 #include <Arduino.h>
 #include <Servo.h>
