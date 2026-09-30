@@ -1,0 +1,38 @@
+META DRONE FIRMWARE - HARDWARE 
+  STM32: WeAct Studio BlackPill V2.0, STM32F411CE
+  ESP32: DOIT ESP32 DEVKIT V1
+
+CONEXÕES STM32 
+---------------------
+Function                  STM32 pin(s)       Connection / notes
+ESC motor 1 signal        PA0                sinal esc, motor 1
+ESC motor 2 signal        PA1                sinal esc, motor 2
+ESC motor 3 signal        PA2                sinal esc, motor 3
+ESC motor 4 signal        PA3                sinal esc, motor 4
+MPU6500 chip select       PA4                CS_MPU, permite passagem via SPI
+MPU6500 SPI clock         PA5                SCK, clock
+MPU6500 SPI MISO          PA6                SPI1 MISO
+MPU6500 SPI MOSI          PA7                SPI1 MOSI
+STM32 -> ESP32 UART TX    PA9                USART1 TX; conectar no ESP32 GPIO16 RX
+ESP32 -> STM32 UART RX    PA10               USART1 RX; conectar no ESP32 GPIO17 TX
+GPS module TX -> STM32 RX PA12               USART6 RX
+GPS module RX <- STM32 TX PA11               USART6 TX; 
+I2C sensors SDA           PB7                I2C1 SDA, comm bus i2c, todos módulos i2c comunicam por ele
+I2C sensors SCL           PB6                I2C1 SCL, clock bus i2c, todos módulos i2c comunicam por ele
+VL53L0X XSHUT             PB8                Pino de controle VL53L0X, pode o desativar imediatamente
+
+I2C DISPOSITVOS QUE ESTÃO CONECTADOS À PB6 (SCL) e PB7 (SDA)
+------------------------------------------------------------------
+Sensor                    Endereço           Notas
+HMC5883L-compatible mag   0x1E               é preciso o calibrar antes de rodar, SE estiver sendo utilizado
+INA219 battery monitor    0x40               monitoramento, módulo obrigatório
+BMP388 barometer          0x77               essencial para funcionamento do kalman e em consequência, módulo obrigatório   
+VL53L0X distance sensor   0x52               checa dist em mm, deve ser apontado para baixo
+
+CONEXÕES ESP32 
+------------------------------------------------------------------
+ESP32 GPIO16 RX <- STM32 PA9 TX
+ESP32 GPIO17 TX -> STM32 PA10 RX
+
+O ESP32 também conecta ao WiFi, na porta 1244, quando mudar de conexão deve-se 
+mudar no código "INTERFACE_PYTHON" em "config"
