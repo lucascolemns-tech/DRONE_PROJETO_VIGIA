@@ -15,32 +15,40 @@ class DistSensor
 public:
     DistSensor() : sensor(&Wire, XSHUT_PIN) {}
 
-    void VL53L0X_init()
+    bool VL53L0X_init()
     {
-        Wire.begin();
-        Wire.setClock(400000);
+        // Wire já foi configurado em i2c_init(); não reinicialize o barramento aqui.
         sensor.begin();
         sensor.VL53L0X_On();
-        sensor.InitSensor(0x52);
-        sensor.StartMeasurementSimplified(range_continuous_polling, NULL);
+        _initStatus = sensor.InitSensor(0x52); // endereço 8-bit do driver; scan I2C mostra 0x29
+        if (_initStatus != 0)
+            return false;
+        _initStatus = sensor.StartMeasurementSimplified(range_continuous_polling, NULL);
+        _initialized = (_initStatus == 0);
+        return _initialized;
     }
 
-    uint16_t VL53L0X_read()
+    int VL53L0X_status() const { return _initStatus; }
+
+    bool VL53L0X_read(uint16_t &distance_mm)
     {
-        sensor.GetMeasurementSimplified(range_continuous_polling, &data);
-        return data.RangeMilliMeter;
+        if (!_initialized || sensor.GetMeasurementSimplified(range_continuous_polling, &data) != 0)
+            return false;
+        if (data.RangeStatus == 0)
+            distance_mm = data.RangeMilliMeter;
+        return true;
     }
 
     bool VL53L0X_detect()
     {
-        uint16_t dist = VL53L0X_read();
-        
-        if (data.RangeStatus == 0) {
-            if (dist < CONDICAO_PARADO)
-                parado = true;
-            else if (dist > CONDICAO_VOANDO)
-                parado = false;
-        }
+        uint16_t dist = 0;
+        if (!VL53L0X_read(dist) || data.RangeStatus != 0)
+            return parado;
+
+        if (dist < CONDICAO_PARADO)
+            parado = true;
+        else if (dist > CONDICAO_VOANDO)
+            parado = false;
         return parado;
     }
 
@@ -48,6 +56,8 @@ private:
     VL53L0X sensor;
     VL53L0X_RangingMeasurementData_t data;
     bool parado = false;
+    bool _initialized = false;
+    int _initStatus = -1;
 };
 
 #endif

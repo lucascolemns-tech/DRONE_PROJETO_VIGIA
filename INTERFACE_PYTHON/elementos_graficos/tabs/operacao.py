@@ -6,6 +6,8 @@ class TabOperacao(ctk.CTkFrame):
     def __init__(self, master, app):
         super().__init__(master, fg_color="transparent")
         self.app = app
+        self._conectado = False
+        self._magnetometro_ativo = True
 
         # guarda o estado de cada botão que pode ser ligado/desligado
         self._habilitados = {
@@ -98,13 +100,20 @@ class TabOperacao(ctk.CTkFrame):
                                 hover_color="#FFFFFF")
 
     def atualizar_estado(self, conectado: bool):
+        self._conectado = conectado
         self._habilitados["conectar"]  = not conectado
         self._habilitados["manual"]    = False
         self._habilitados["teste"]     = False
-        self._habilitados["calibrar"]  = conectado
+        self._habilitados["calibrar"]  = conectado and self._magnetometro_ativo
         self._habilitados["finalizar"] = conectado
-        self.btn_calibrar.configure(state="normal" if conectado else "disabled")
+        self.btn_calibrar.configure(state="normal" if self._habilitados["calibrar"] else "disabled")
         # btn_camera permanece sempre habilitado, igual ao monolítico
+        self._atualizar_aparencia()
+
+    def definir_magnetometro_ativo(self, ativo):
+        self._magnetometro_ativo = bool(ativo)
+        self._habilitados["calibrar"] = self._conectado and self._magnetometro_ativo
+        self.btn_calibrar.configure(state="normal" if self._habilitados["calibrar"] else "disabled")
         self._atualizar_aparencia()
 
     def definir_calibracao_pendente(self, pendente):

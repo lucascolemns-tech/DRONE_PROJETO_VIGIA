@@ -12,7 +12,7 @@ def processar_dados_esp(dados_brutos):
             return f"Telemetria contém valor inválido: {dados_brutos}", None
 
         if (valores[12] not in (0.0, 1.0) or valores[13] not in (0.0, 1.0) or
-                valores[14] not in (0.0, 1.0, 2.0, 3.0, 4.0) or
+                valores[14] not in (0.0, 1.0, 2.0, 3.0, 4.0, 5.0) or
                 not 0.0 <= valores[15] <= 100.0):
             return f"Indicador de telemetria inválido: {dados_brutos}", None
 

@@ -116,9 +116,9 @@ void processarTelemetria()
         novos_dados[7] < 0.0f || novos_dados[7] > 2500.0f ||
         novos_dados[8] < 0.0f || novos_dados[8] > 2500.0f ||
         novos_dados[9] < 0.0f || novos_dados[9] > 2500.0f ||
-        novos_dados[10] < 0.0f || novos_dados[10] > 32.0f || fabsf(novos_dados[11]) > 100000.0f ||
+        (novos_dados[10] != -1.0f && (novos_dados[10] < 0.5f || novos_dados[10] > 32.0f)) || fabsf(novos_dados[11]) > 100000.0f ||
         (novos_dados[12] != 0.0f && novos_dados[12] != 1.0f) ||
-        novos_dados[13] < 0.0f || novos_dados[13] > 4.0f ||
+        novos_dados[13] < 0.0f || novos_dados[13] > 5.0f ||
         floorf(novos_dados[13]) != novos_dados[13] ||
         novos_dados[14] < 0.0f || novos_dados[14] > 100.0f)
     {

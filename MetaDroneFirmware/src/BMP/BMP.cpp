@@ -1,5 +1,10 @@
 #include "BMP.h"
 #include <math.h>
+#include <limits.h>
+
+#if defined(STM32_DEBUG_UART)
+extern Uart DebugSerial;
+#endif
 
 //curiosidade o underline antes da variavel é para dizer que é PRIVADO e EXCLUSIVA da classe
 BMP::BMP(uint8_t endereco)
@@ -34,12 +39,12 @@ uint8_t BMP::lerRegistrador(uint8_t reg)
   return 0xFF;
 }
 
-void BMP::escreverRegistrador(uint8_t reg, uint8_t valor)
+bool BMP::escreverRegistrador(uint8_t reg, uint8_t valor)
 {
   Wire.beginTransmission(_endereco);
   Wire.write(reg);
   Wire.write(valor);
-  Wire.endTransmission();
+  return Wire.endTransmission() == 0;
 }
 
 bool BMP::lerRegistradores(uint8_t reg, uint8_t *buffer, uint8_t tamanho)
@@ -184,34 +189,36 @@ float BMP::compensarPressao(uint32_t raw_press)
 
 bool BMP::inicializar()
 { 
+  _temAmostra = false;
+  _ultimaAmostraMs = 0;
   Wire.beginTransmission(_endereco);
 
   if (Wire.endTransmission() != 0)
   {
 #if defined(STM32_DEBUG_UART)
-    Serial.print("BMP388 nao encontrado em 0x");
-    Serial.println(_endereco, HEX);
+    DebugSerial.print("BMP388 nao encontrado em 0x");
+    DebugSerial.println(_endereco, HEX);
 #endif
     return false;
   }
 
   uint8_t id = lerRegistrador(REG_CHIP_ID);
 #if defined(STM32_DEBUG_UART)
-  Serial.print("BMP388 encontrado em 0x");
-  Serial.println(_endereco, HEX);
-  Serial.print("CHIP_ID = 0x");
+  DebugSerial.print("BMP388 encontrado em 0x");
+  DebugSerial.println(_endereco, HEX);
+  DebugSerial.print("CHIP_ID = 0x");
 
  //garantir que sejam exibidos sempre dois digitos, se for menor que 16 exibe so um
   if (id < 0x10)
-    Serial.print("0");
+    DebugSerial.print("0");
 
-  Serial.println(id, HEX);
+  DebugSerial.println(id, HEX);
 #endif
 
   if (id != BMP_ID)
   {
 #if defined(STM32_DEBUG_UART)
-    Serial.println("CHIP_ID incorreto!");
+    DebugSerial.println("CHIP_ID incorreto!");
 #endif
     return false;
   }
@@ -219,18 +226,33 @@ bool BMP::inicializar()
   if (!lerCalibracao())
   {
 #if defined(STM32_DEBUG_UART)
-    Serial.println("Calibracao BMP invalida!");
+    DebugSerial.println("Calibracao BMP invalida!");
 #endif
     return false;
   }
 
-  escreverRegistrador(OSR, 0x03); //ultra alta resolução
-  escreverRegistrador(REG_CONFIG, 0x00);
-  escreverRegistrador(ODR, 0x00); //taxa de amostras 
-  escreverRegistrador(PWR_CTRL, 0x33); //tirar do sleep
+  if (!escreverRegistrador(OSR, 0x03) ||       // pressão x8, temperatura x1
+      !escreverRegistrador(REG_CONFIG, 0x00) || // filtro IIR desligado
+      !escreverRegistrador(ODR, 0x00) ||        // ODR 200 Hz
+      !escreverRegistrador(PWR_CTRL, 0x33))     // pressão + temperatura, modo normal
+  {
+#if defined(STM32_DEBUG_UART)
+    DebugSerial.println("Falha ao escrever configuração do BMP388");
+#endif
+    return false;
+  }
+
+  if (lerRegistrador(OSR) != 0x03 || lerRegistrador(REG_CONFIG) != 0x00 ||
+      lerRegistrador(ODR) != 0x00 || lerRegistrador(PWR_CTRL) != 0x33)
+  {
+#if defined(STM32_DEBUG_UART)
+    DebugSerial.println("Readback de configuração BMP388 divergente");
+#endif
+    return false;
+  }
 
 #if defined(STM32_DEBUG_UART)
-  Serial.println("BMP inicializado!");
+  DebugSerial.println("BMP388 configurado; aguardando primeira amostra");
 #endif
   return true;
 }
@@ -239,8 +261,13 @@ bool BMP::lerBMP()
 {
   uint8_t status = lerRegistrador(REG_STATUS);
 
-  if (status == 0xFF || (status & 0x60) != 0x60)
+  if (status == 0xFF)
     return false;
+
+  // Data-ready pode estar momentaneamente limpo entre conversões; isso não é
+  // falha do sensor. O chamador verifica a idade da última amostra válida.
+  if ((status & 0x60) != 0x60)
+    return true;
 
   uint8_t dados[6];
   if (!lerRegistradores(REG_DATA, dados, 6))
@@ -258,5 +285,17 @@ bool BMP::lerBMP()
 
   temperatura = nova_temperatura;
   pressao = nova_pressao;
+  _ultimaAmostraMs = millis();
+  _temAmostra = true;
   return true;
+}
+
+bool BMP::amostraRecente(unsigned long idadeMaximaMs) const
+{
+  return _temAmostra && (millis() - _ultimaAmostraMs <= idadeMaximaMs);
+}
+
+unsigned long BMP::idadeAmostraMs() const
+{
+  return _temAmostra ? millis() - _ultimaAmostraMs : ULONG_MAX;
 }

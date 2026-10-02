@@ -128,6 +128,8 @@ class PainelTelemetria(ctk.CTkFrame):
             texto_mag, cor_mag = "Calibração falhou · repita em todos os eixos", "#B91C1C"
         elif status_mag == 4:
             texto_mag, cor_mag = "Magnetômetro não detectado", "#B91C1C"
+        elif status_mag == 5:
+            texto_mag, cor_mag = "Bússola desativada na configuração", "#6B7280"
         else:
             texto_mag, cor_mag = "Bússola sem calibração", "#B45309"
         self.mag_status.configure(text=texto_mag, text_color=cor_mag)

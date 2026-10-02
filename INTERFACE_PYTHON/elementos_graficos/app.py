@@ -213,6 +213,7 @@ class App:
         if dados is not None:
             self.tab_func.painel.atualizar(dados)
             self._ultimo_status_mag = dados["mag_status"]
+            self.tab_func.definir_magnetometro_ativo(dados["mag_status"] not in (4, 5))
             if self._calibracao_pendente and (
                     dados["mag_status"] == 1 or
                     (dados["mag_status"] in (3, 4) and dados["mag_status"] != self._status_mag_no_pedido) or

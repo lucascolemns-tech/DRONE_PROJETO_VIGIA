@@ -37,6 +37,10 @@ INA219_Sensor ina(0x40);
 Uart SerialGPS(PA_12, PA_11);
 GPS_NEO6M gps(SerialGPS);
 MAG_SENSOR magnetometro;
+#if defined(STM32_DEBUG_UART)
+// USART3 PB10/PB11: mantém o debug separado da telemetria em PA9/PA10 e dos ESCs PA0..PA3.
+Uart DebugSerial(PB_11, PB_10); // RX, TX
+#endif
 
 //desenvolveremos estados para verificar ações do drone
 enum EstadoVoo { DESLIGADO, PRONTO, VOANDO }; 
@@ -49,6 +53,7 @@ float yaw_alvo = 0.0f;
 bool mpu_pronto = false;
 bool bmp_pronto = false;
 bool ina_pronto = false;
+bool vl53_pronto = false;
 bool comando_valido = false;
 bool mag_pronto = false;
 bool mag_amostra_valida = false;
@@ -124,6 +129,37 @@ void i2c_init()
     Wire.setClock(400000);
 }
 
+#if defined(STM32_DEBUG_UART)
+void i2c_debug_scan()
+{
+    bool bmp_ack = false, ina_ack = false, vl53_ack = false, hmc_ack = false;
+    uint8_t encontrados = 0;
+    DebugSerial.println("I2C scan PB7/SDA PB6/SCL @ 400 kHz (7-bit addresses):");
+    for (uint8_t endereco = 0x03; endereco <= 0x77; ++endereco)
+    {
+        Wire.beginTransmission(endereco);
+        if (Wire.endTransmission() == 0)
+        {
+            ++encontrados;
+            DebugSerial.print("  ACK 0x");
+            if (endereco < 0x10) DebugSerial.print("0");
+            DebugSerial.println(endereco, HEX);
+            bmp_ack |= endereco == 0x77 || endereco == 0x76;
+            ina_ack |= endereco == 0x40;
+            vl53_ack |= endereco == 0x29;
+            hmc_ack |= endereco == 0x1E;
+        }
+    }
+    DebugSerial.print("I2C devices ACKed: ");
+    DebugSerial.println(encontrados);
+    DebugSerial.print("Expected: BMP 0x77/0x76="); DebugSerial.print(bmp_ack ? "ACK" : "MISSING");
+    DebugSerial.print(" INA 0x40="); DebugSerial.print(ina_ack ? "ACK" : "MISSING");
+    DebugSerial.print(" VL53L0X 0x29="); DebugSerial.print(vl53_ack ? "ACK" : "MISSING");
+    DebugSerial.print(" HMC5883 0x1E="); DebugSerial.println(hmc_ack ? "ACK" : "MISSING");
+    DebugSerial.println("Note: VL53L0X driver uses 0x52 as 8-bit form of 7-bit 0x29; MPU6500 is SPI, not I2C.");
+}
+#endif
+
 bool bmp_init()
 {
     bmp.pressao = 0.0f;
@@ -135,32 +171,64 @@ bool bmp_init()
     while (millis() - inicio < 2000)
     {
         bmp.lerBMP();
-        if (isfinite(bmp.pressao) && bmp.pressao > 0.0f) //checa por valores válido do bmp
+        if (bmp.amostraRecente(100) && isfinite(bmp.pressao) && bmp.pressao > 0.0f)
             return true;
         delay(20);
     }
+#if defined(STM32_DEBUG_UART)
+    DebugSerial.println("BMP388: sem amostra válida após 2000 ms");
+#endif
     return false; 
 }
 
 void sensores_init()
 {
 
-    mpu_pronto = mpu.inicializar() && mpu.calibrarMPU();
+    bool mpu_identificado = mpu.inicializar();
+#if defined(STM32_DEBUG_UART)
+    DebugSerial.println(mpu_identificado ? "MPU6500 SPI WHO_AM_I=0x70: ACK" : "MPU6500 SPI WHO_AM_I: FAIL");
+#endif
+    mpu_pronto = mpu_identificado && mpu.calibrarMPU();
+#if defined(STM32_DEBUG_UART)
+    DebugSerial.println(mpu_pronto ? "MPU6500 calibração: OK" : "MPU6500 calibração: FAIL");
+#endif
+
     bmp_pronto = bmp_init();
-  
-    distsensor.VL53L0X_init();
+#if defined(STM32_DEBUG_UART)
+    DebugSerial.println(bmp_pronto ? "BMP388 0x77 + amostra: OK" : "BMP388 0x77 + amostra: FAIL");
+#endif
+
+    vl53_pronto = distsensor.VL53L0X_init();
+#if defined(STM32_DEBUG_UART)
+    DebugSerial.print("VL53L0X 0x29 init status: "); DebugSerial.println(distsensor.VL53L0X_status());
+#endif
     gps.init();
 
     //checar necessidade de usar o INA219
     #if USAR_INA219
-    ina_pronto = ina.init() && ina.ler();
+    bool ina_identificado = ina.init();
+    ina_pronto = ina_identificado && ina.ler();
+#if defined(STM32_DEBUG_UART)
+    DebugSerial.println(!ina_identificado ? "INA219 0x40: MISSING/INIT FAIL" :
+                        (ina_pronto ? "INA219 0x40 + leitura: OK" : "INA219 0x40 ACK; leitura inválida"));
+#endif
     #else
     ina_pronto = false;
     #endif
     //checar se é necessario compilar o magnetometro
     #if USAR_MAG
         mag_pronto = magnetometro.mag_init();
+#if defined(STM32_DEBUG_UART)
+        DebugSerial.println(mag_pronto ? "HMC5883 0x1E + init: OK" : "HMC5883 0x1E: MISSING/INIT FAIL");
+#endif
+    #else
+#if defined(STM32_DEBUG_UART)
+        DebugSerial.println("HMC5883 init desativado (USAR_MAG=0)");
+#endif
     #endif
+#if defined(STM32_DEBUG_UART)
+    i2c_debug_scan();
+#endif
 
     if (bmp_pronto)
     {   //formula para calculo do parâmetro inicial de altura, e inicializa kalman
@@ -214,14 +282,21 @@ void sensores_ler()
     if (bmp_pronto && (agora_ms - tempoBMP >= 10))
     {
         tempoBMP = agora_ms;
-        if (!bmp.lerBMP())
+        bmp.lerBMP();
+        if (!bmp.amostraRecente(100))
+        {
             bmp_pronto = false;
+#if defined(STM32_DEBUG_UART)
+            DebugSerial.println("BMP388: amostra ficou stale (>100 ms)");
+#endif
+        }
     }
     //roda a cada 50ms via i2c
     if (agora_ms - tempoRange >= 50)
     {
         tempoRange = agora_ms;
-        distancia_mm = distsensor.VL53L0X_read();
+        if (vl53_pronto && !distsensor.VL53L0X_read(distancia_mm))
+            vl53_pronto = false;
     }
     //roda a cada 100ms via i2c, se for utilizado
     #if USAR_INA219
@@ -432,7 +507,8 @@ void comm_enviar()
                      (float)pid.GetM3(), (float)pid.GetM4(),
                      USAR_INA219 ? ina.getTensao() : -1.0f, gps.checar() ? (float)gps.obter_alt() : 0.0f,
                      sensores_ok,
-                     magnetometro.getStatus(), magnetometro.getProgresso()); //caso você retorne obter_alt puro, quando houver um erro retorna NaN
+                     USAR_MAG ? magnetometro.getStatus() : 5.0f,
+                     USAR_MAG ? magnetometro.getProgresso() : 0.0f); //caso você retorne obter_alt puro, quando houver um erro retorna NaN
 }
 
 //avaliação do serial, compilado somente se STM32_DEBUG_UART for verdadeiro, 
@@ -443,21 +519,27 @@ void debug_serial()
         return;
     tempoDebug = millis();
 
-    Serial.print(mpu.angulo_x); Serial.print(",");
-    Serial.print(mpu.angulo_y); Serial.print(",");
-    Serial.print(mpu.angulo_z); Serial.print(",");
-    Serial.print(kf.getAlt()); Serial.print(",");
-    Serial.print(kf.getVel()); Serial.print(",");
-    Serial.print(USAR_INA219 ? ina.getTensao() : -1.0f); Serial.print(",");
-    Serial.print(distancia_mm); Serial.print(",");
-    Serial.println((int)estado);
+    DebugSerial.print(mpu.angulo_x); DebugSerial.print(",");
+    DebugSerial.print(mpu.angulo_y); DebugSerial.print(",");
+    DebugSerial.print(mpu.angulo_z); DebugSerial.print(",");
+    DebugSerial.print(kf.getAlt()); DebugSerial.print(",");
+    DebugSerial.print(kf.getVel()); DebugSerial.print(",");
+    DebugSerial.print(bmp.pressao); DebugSerial.print(",");
+    DebugSerial.print(bmp.temperatura); DebugSerial.print(",");
+    DebugSerial.print(bmp.idadeAmostraMs()); DebugSerial.print(",");
+    DebugSerial.print(bmp_pronto ? 1 : 0); DebugSerial.print(",");
+    DebugSerial.print(USAR_INA219 ? ina.getTensao() : -1.0f); DebugSerial.print(",");
+    DebugSerial.print(distancia_mm); DebugSerial.print(",");
+    DebugSerial.println((int)estado);
 #endif
 }
 
 void setup()
 {
 #if defined(STM32_DEBUG_UART)
-    Serial.begin(115200);
+    DebugSerial.begin(115200);
+    DebugSerial.println("\r\n=== VIGIA sensor startup debug ===");
+    DebugSerial.println("roll,pitch,yaw,alt_m,vel_mps,pressure_Pa,temp_C,baro_age_ms,baro_ok,battery_V,range_mm,state");
 #endif
     //inicialização de todos os filtros e módulos
     esc.begin();

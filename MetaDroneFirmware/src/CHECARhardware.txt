@@ -27,7 +27,7 @@ Sensor                    Endereço           Notas
 HMC5883L-compatible mag   0x1E               é preciso o calibrar antes de rodar, SE estiver sendo utilizado
 INA219 battery monitor    0x40               monitoramento, módulo obrigatório
 BMP388 barometer          0x77               essencial para funcionamento do kalman e em consequência, módulo obrigatório   
-VL53L0X distance sensor   0x52               checa dist em mm, deve ser apontado para baixo
+VL53L0X distance sensor   0x29 (7-bit)      driver usa 0x52 (8-bit); mede mm, aponta para baixo
 
 CONEXÕES ESP32 
 ------------------------------------------------------------------

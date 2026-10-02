@@ -32,6 +32,8 @@ public:
 
   bool inicializar();
   bool lerBMP();
+  bool amostraRecente(unsigned long idadeMaximaMs) const;
+  unsigned long idadeAmostraMs() const;
 
   float temperatura;
   float pressao;
@@ -40,9 +42,11 @@ public:
 private:
 
   uint8_t _endereco;
+  unsigned long _ultimaAmostraMs = 0;
+  bool _temAmostra = false;
 
   uint8_t lerRegistrador(uint8_t reg);
-  void escreverRegistrador(uint8_t reg, uint8_t valor);
+  bool escreverRegistrador(uint8_t reg, uint8_t valor);
   bool lerRegistradores(uint8_t  reg, uint8_t* buffer, uint8_t  tamanho);
   bool lerCalibracao();
   

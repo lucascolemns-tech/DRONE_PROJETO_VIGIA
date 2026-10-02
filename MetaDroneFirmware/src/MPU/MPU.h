@@ -13,8 +13,7 @@
 #define PINO_MOSI  PA7
 #define CS_MPU     PA4
 
-//endereco mpu6050
-#define MPU6500_ADDRESS 0x68
+//Identificação do MPU6500 via SPI (não há endereço I2C neste driver)
 #define MPU_ID          0x70
 #define MODELO_MPU      0x75
 
