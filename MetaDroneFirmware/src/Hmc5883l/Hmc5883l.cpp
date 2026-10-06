@@ -83,18 +83,15 @@ bool MAG_SENSOR::iniciarCalibracao()
     if (!sensor_pronto || getCalibrando())
         return false;
 
-    min_x = min_y = min_z = INFINITY;
+    min_x = min_y = min_z = INFINITY; //determina os limites a serem calculados 
     max_x = max_y = max_z = -INFINITY;
-    amostras_calibracao = 0;
-    inicio_calibracao = millis();
+    amostras_calibracao = 0; //n° de amostras para calibração
+    inicio_calibracao = millis(); //contagem de tempo total
     calibracao_status = CALIBRANDO;
     return true;
 }
 
-void MAG_SENSOR::rejeitarCalibracao()
-{
-    calibracao_status = sensor_pronto ? CALIBRACAO_FALHOU : SENSOR_AUSENTE;
-}
+void MAG_SENSOR::rejeitarCalibracao() { calibracao_status = sensor_pronto ? CALIBRACAO_FALHOU : SENSOR_AUSENTE; }
 
 float MAG_SENSOR::getProgresso() const
 {
@@ -159,6 +156,7 @@ bool MAG_SENSOR::salvarCalibracao()
 {
     DadosCalibracao dados = {};
 
+    //copia dados fudamentais para o funcioamento da mainSTM32
     dados.identificador = IDENTIFICADOR;
     dados.versao = CALIBRACAO_VERSAO;
     dados.offset_x = offset_x;
@@ -199,6 +197,7 @@ bool MAG_SENSOR::carregarCalibracao()
     EEPROM.get(0, dados);
     uint32_t checksum = Algoritmo_validacaoEEPROMM(
         reinterpret_cast<const uint8_t*>(&dados) + sizeof(dados.identificador),
+        //offsetof retorna descocamento binário de onde estava na memória até onde "foi"
         offsetof(DadosCalibracao, validacaoSomatorio) - sizeof(dados.identificador));
 
     if (dados.identificador != IDENTIFICADOR || dados.versao != CALIBRACAO_VERSAO ||

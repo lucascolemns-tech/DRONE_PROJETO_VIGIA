@@ -1,23 +1,33 @@
-# Sensor and I2C startup debugger
+# Firmware sensor and I2C diagnostics
 
-Use the debug target to get sensor-by-sensor initialization results and a full I2C ACK scan at startup. The normal `blackpill_f411ce` target remains without debug prints.
+## STM32 (PlatformIO default target)
 
-## Build and connect
+Open the PlatformIO serial monitor at **115200 baud**. `STM32_DEBUG_UART` and USB CDC are already enabled for `blackpill_f411ce`. The STM32 startup log reports sensor initialization and the periodic log reports UART frame counts and sensor readiness. This firmware does not run an I2C address scan.
 
-From `MetaDroneFirmware` run:
+| Device | Firmware setting / expected 7-bit address | Interface |
+|---|---:|---|
+| BMP388 barometer | `0x77`, automatically retries `0x76` | I2C, SDA `PB7`, SCL `PB6` |
+| VL53L0X range sensor | `0x29` | I2C; the STM32 library initializer takes `0x52` in its 8-bit convention |
+| INA219 current sensor | `0x40` | I2C, optional and disabled by default |
+| HMC5883L magnetometer | `0x1E` | I2C, optional and disabled by default |
+| MPU6500 | no I2C address | SPI; `WHO_AM_I` register `0x75` should return `0x70` |
 
-```powershell
-pio run -e blackpill_f411ce_debug
-pio run -e blackpill_f411ce_debug -t upload
-pio device monitor -b 115200
-```
+The BMP initialization checks its chip ID, calibration reads, and configuration readback. Check power, common ground, SDA/SCL wiring, pull-ups, and the selected address if an I2C sensor fails to initialize.
 
-The upload uses the configured ST-Link. Connect a 3.3 V USB-to-UART adapter to the STM32 debug port: adapter RX to PB10 (TX), common GND, and optionally adapter TX to PB11 (RX). Do not connect the adapter's VCC. PB10/PB11 keep debug separate from STM32-to-ESP32 UART on PA9/PA10 and ESC outputs on PA0..PA3.
+The periodic STM32 line reports MPU/BMP/range readiness and BMP sample age. BMP readings use the BMP388 data-ready flags (status bits 5 and 6); a transient poll with no new sample keeps the recent valid sample for up to 100 ms. Kalman receives a barometer update only when a fresh sample was acquired. If the BMP reports an error, the essential sensor gate keeps the aircraft in `DESLIGADO` until retry succeeds.
 
-## Expected I2C scan
+## ESP32 telemetry and TCP diagnostics
 
-The scan is on PB7/SDA and PB6/SCL and prints 7-bit addresses that ACK. Expected devices are BMP388 at 0x77 (0x76 is also reported as a possible address), INA219 at 0x40, VL53L0X at 0x29, and HMC5883-compatible magnetometer at 0x1E if fitted. The VL53L0X driver parameter 0x52 is its 8-bit address form; use 0x29 when interpreting the scan. MPU6500 is SPI on PA4..PA7, so its detection is reported from WHO_AM_I register 0x75 (expected value 0x70), not in the I2C scan.
+Flash `esp32doit-devkit-v1`, open its serial monitor at **115200 baud**, and check the startup Wi-Fi IP and TCP port. The interface in `Downloads/META_DRONE/INTERFACE_PYTHON` connects to `10.85.164.132:1244`.
 
-For each sensor, distinguish an I2C ACK from successful initialization and a valid reading: the boot log reports the driver result and the scan separately. A listed address means a device ACKed on the live bus; it does not prove that it is the expected chip. No board is attached to this source-only review, so physical presence must be confirmed from the monitor output after flashing.
+The once-per-second ESP32 log reports UART bytes, headers, CRC-valid frames, CRC failures, rejected frames, the invalid field/value, telemetry freshness, and Wi-Fi/TCP transmit status. `RX15=` prints the last complete 15-float UART frame so the field order and values can be compared directly.
 
-The recurring CSV line reports angles, fused altitude/velocity, BMP388 pressure in Pa, temperature, age of the latest valid barometer sample in ms, barometer readiness, battery voltage, range, and flight state. A barometer sample older than 100 ms marks the barometer not ready; brief data-ready gaps no longer count as a hard failure.
+The 15 fields are: roll, pitch, yaw, altitude, vertical velocity, temperature, M1–M4, battery voltage, GPS altitude, sensor/system-ready flag, magnetometer status, and magnetometer calibration progress. `frame/s` above zero confirms complete CRC-valid STM32 frames are reaching the ESP32. `TCP=1` with `txB/s` above zero confirms the ESP32 is writing telemetry to the connected interface.
+
+## Standalone ESP32 sketch (`Downloads/META_DRONE/DRONAO_ESP32`)
+
+The sketch scans I2C during BMP startup on SDA GPIO 26 / SCL GPIO 27 at 100 kHz. Its BMP driver now checks both data-ready bits, transport results, calibration coefficients, compensated pressure/temperature ranges, and register readback. Serial output reports the last sample age; `STALE` means no successful sample for more than 500 ms.
+
+## Barometric altitude reference
+
+Both implementations now capture the first valid pressure sample at startup and report altitude relative to that launch pressure, so the grounded value starts near `0 m` at any local elevation. Weather and pressure drift still affect long flights; the current code does not fuse a GPS/barometer pressure reference.

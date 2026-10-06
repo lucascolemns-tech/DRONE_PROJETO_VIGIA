@@ -15,9 +15,9 @@ M1 e M4 no sentido horário, M2 e M3 no sentido anti-horário
 */
 
 PID::PID()
-:   XAnglePD(&Xinput, &Xsetpoint, &Xoutput, -10, 10, 0.0, 0.0, 0.0),
-    YAnglePD(&Yinput, &Ysetpoint, &Youtput, -10, 10, 0.0, 0.0, 0.0),
-    ZAnglePD(&Zinput, &Zsetpoint, &Zoutput, -10, 10, 0.0, 0.0, 0.0),
+:   XAnglePD(&Xinput, &Xsetpoint, &Xoutput, -150, 150, 0.0, 0.0, 0.0),
+    YAnglePD(&Yinput, &Ysetpoint, &Youtput, -150, 150, 0.0, 0.0, 0.0),
+    ZAnglePD(&Zinput, &Zsetpoint, &Zoutput, -100, 100, 0.0, 0.0, 0.0),
     HeightPD(&Hinput, &Hsetpoint, &Houtput, -15, 15, 0.0, 0.0, 0.0)
 {}
 

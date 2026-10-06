@@ -22,13 +22,22 @@ def abrir_janela_pid(parent, esp):
 
     erro = ctk.CTkLabel(
         janela,
-        text="O firmware atual não aceita alterações de PID pela interface.",
+        text="Os ganhos só podem ser alterados com o drone desarmado.",
         text_color="red",
         wraplength=260,
     )
     erro.pack(pady=8)
 
-    ctk.CTkButton(janela, text="INDISPONÍVEL NO FIRMWARE", state="disabled", corner_radius=0,
+    def enviar_pid():
+        kp = campos["KP (Proporcional)"].get()
+        ki = campos["KI (Integral)"].get()
+        kd = campos["KD (Derivativo)"].get()
+        if esp.enviar_pid(kp, ki, kd):
+            erro.configure(text="Solicitação enviada; o drone só aceita ganhos desarmado.", text_color="green")
+        else:
+            erro.configure(text="Falha ao enviar. Verifique os valores e a conexão.", text_color="red")
+
+    ctk.CTkButton(janela, text="ENVIAR GANHOS PID", command=enviar_pid, corner_radius=0,
                   text_color="black", font=("Arial Black", 16),
                   fg_color="#FFFFFF", border_width=3, border_color=COR_BORDA,
                   hover_color="#ffffff"

@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"name": "MetaDroneFirmware",
+			"path": "../../../Documents/PlatformIO/Projects/MetaDroneFirmware"
+		},
+		{
+			"name": "INTERFACE_PYTHON",
+			"path": "."
+		},
+		{
+			"name": "MetaDroneFirmware",
+			"path": "../../../Desktop/MetaDroneFirmware"
+		}
+	],
+	"settings": {
+		"platformio-ide.autoPreloadEnvTasks": true
+	}
+}

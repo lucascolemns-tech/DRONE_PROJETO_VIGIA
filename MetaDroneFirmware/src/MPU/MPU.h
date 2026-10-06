@@ -13,7 +13,7 @@
 #define PINO_MOSI  PA7
 #define CS_MPU     PA4
 
-//Identificação do MPU6500 via SPI (não há endereço I2C neste driver)
+// O MPU6500 deste projeto usa SPI; MPU_ID é o valor esperado de WHO_AM_I.
 #define MPU_ID          0x70
 #define MODELO_MPU      0x75
 

@@ -22,6 +22,11 @@ public:
                      float mag_status, float mag_progresso);
     float UART_receber(int idx) const { return (idx >= 0 && idx < 6) ? comando[idx] : 0.0f; }
     unsigned long UART_TempoUltimoPacote() const { return tempoUltimoPacote; }
+    uint32_t UART_FramesEnviados() const { return framesEnviados; }
+    uint32_t UART_BytesRecebidos() const { return bytesRecebidos; }
+    uint32_t UART_Cabecalhos() const { return cabecalhosRecebidos; }
+    uint32_t UART_FramesRecebidos() const { return framesRecebidos; }
+    uint32_t UART_CRCFailures() const { return falhasCRC; }
 
 private:
     uint8_t rx_state = 0;
@@ -31,6 +36,11 @@ private:
     float comando[6] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
     bool pronto = false;
     unsigned long tempoUltimoPacote = 0;
+    uint32_t framesEnviados = 0;
+    uint32_t bytesRecebidos = 0;
+    uint32_t cabecalhosRecebidos = 0;
+    uint32_t framesRecebidos = 0;
+    uint32_t falhasCRC = 0;
 };
 
 #endif

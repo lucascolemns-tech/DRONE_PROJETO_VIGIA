@@ -6,7 +6,7 @@
 
 #pragma comment(lib, "Xinput9_1_0.lib") 
 
-#define ZONAMORTA 2500 
+#define ZONAMORTA 1000
 
 int funcaonormalizar(SHORT valorBruto)
 {

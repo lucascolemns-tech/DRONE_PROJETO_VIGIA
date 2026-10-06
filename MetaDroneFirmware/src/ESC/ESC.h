@@ -53,6 +53,26 @@ public:
     _timer->setCaptureCompare(4, m4, MICROSEC_COMPARE_FORMAT);
   }
 
+  uint32_t getPulseWidthUs(uint32_t channel)
+  {
+    if (channel < 1 || channel > 4)
+      return 0;
+    return _timer->getCaptureCompare(channel, MICROSEC_COMPARE_FORMAT);
+  }
+
+  uint32_t getFrequencyHz()
+  {
+    return _timer->getOverflow(HERTZ_FORMAT);
+  }
+
+  bool pwmChannelsConfigured()
+  {
+    return _timer->getMode(1) == TIMER_OUTPUT_COMPARE_PWM1 &&
+           _timer->getMode(2) == TIMER_OUTPUT_COMPARE_PWM1 &&
+           _timer->getMode(3) == TIMER_OUTPUT_COMPARE_PWM1 &&
+           _timer->getMode(4) == TIMER_OUTPUT_COMPARE_PWM1;
+  }
+
   void armarESC()
   {
     ESCRodar(ESC_MIN_US, ESC_MIN_US, ESC_MIN_US, ESC_MIN_US);

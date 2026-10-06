@@ -17,7 +17,13 @@ public:
     void UART_init();
     bool UART_receber();
     void UART_enviar(float roll, float pitch, float yaw, float throttle, bool controle_valido, bool calibrar_mag);
+    void UART_enviarPID(float kp, float ki, float kd);
     float UART_receber(int idx) const { return (idx >= 0 && idx < 15) ? telemetria[idx] : 0.0f; }
+    uint32_t UART_BytesRecebidos() const { return bytesRecebidos; }
+    uint32_t UART_Cabecalhos() const { return cabecalhosRecebidos; }
+    uint32_t UART_Frames() const { return framesRecebidos; }
+    uint32_t UART_CRCFailures() const { return falhasCRC; }
+    uint32_t UART_Timeouts() const { return timeoutsRecepcao; }
 
 private:
     //idx é o index percorrido, state autoexplicativo, buf tamanho do dado total
@@ -27,6 +33,11 @@ private:
     uint8_t rx_buf[BYTES_RECEBIDOS];
     float telemetria[15] = {0};
     bool pronto = false;
+    uint32_t bytesRecebidos = 0;
+    uint32_t cabecalhosRecebidos = 0;
+    uint32_t framesRecebidos = 0;
+    uint32_t falhasCRC = 0;
+    uint32_t timeoutsRecepcao = 0;
 };
 
 #endif

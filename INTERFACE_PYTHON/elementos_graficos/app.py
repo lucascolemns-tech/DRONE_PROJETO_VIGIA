@@ -7,6 +7,7 @@ import customtkinter as ctk
 from config import (
     ESP_IP, ESP_PORT, SOCKET_TIMEOUT, CONTROLE_EXE, CAMERA_URL,
     MAX_ROLL, MAX_PITCH, MAX_YAW, MAX_THROTTLE, THROTTLE_ARM_AXIS,
+    CONTROLE_DEADZONE, CONTROLE_EXPO,
     WINDOW_W, WINDOW_H, WINDOW_TITULO, ICONE_IMG,
 )
 from nucleo import ESPCom, ControleHardware, processar_dados_esp
@@ -23,7 +24,9 @@ class App:
         self.esp = ESPCom(ESP_IP, ESP_PORT, SOCKET_TIMEOUT)
         self.controle = ControleHardware(CONTROLE_EXE, MAX_ROLL, MAX_PITCH, MAX_YAW,
                                          max_throttle=MAX_THROTTLE,
-                                         throttle_arm_axis=THROTTLE_ARM_AXIS)
+                                         throttle_arm_axis=THROTTLE_ARM_AXIS,
+                                         controle_deadzone=CONTROLE_DEADZONE,
+                                         controle_expo=CONTROLE_EXPO)
         self.ativo = False
         self._fila_telemetria = queue.Queue(maxsize=32)
 
@@ -155,9 +158,14 @@ class App:
     #comunicação controle xbox
     def _loop_controle(self):
         ultimo_envio = 0.0
+        ultimo_diagnostico = 0.0
         while self.ativo:
             cmd = self.controle.ler_comandos()
             if cmd is None:
+                agora = time.monotonic()
+                if agora - ultimo_diagnostico >= 2.0:
+                    print("Controle ativo, mas sem amostra XInput válida; nenhum setpoint foi enviado.")
+                    ultimo_diagnostico = agora
                 time.sleep(0.01)
                 continue
 
@@ -168,6 +176,9 @@ class App:
             roll, pitch, yaw, throttle = cmd
             if self.esp.enviar_setpoint(roll, pitch, yaw, throttle):
                 ultimo_envio = agora
+                if agora - ultimo_diagnostico >= 1.0:
+                    print(f"Setpoint enviado ao ESP32: roll={roll:.1f} pitch={pitch:.1f} yaw={yaw:.1f} throttle={throttle:.3f}")
+                    ultimo_diagnostico = agora
             else:
                 time.sleep(0.01)
 
@@ -193,7 +204,10 @@ class App:
                             pass
                 else:
                     print(f"ESP32: {msg}")
-            time.sleep(0.05)
+                # Drene linhas já acumuladas no mesmo recv() sem limitar a
+                # recepção a 20 frames/s, a mesma taxa de envio do ESP32.
+                continue
+            time.sleep(0.005)
 
     def _processar_fila_telemetria(self):
         if not self.window.winfo_exists():
@@ -213,10 +227,10 @@ class App:
         if dados is not None:
             self.tab_func.painel.atualizar(dados)
             self._ultimo_status_mag = dados["mag_status"]
-            self.tab_func.definir_magnetometro_ativo(dados["mag_status"] not in (4, 5))
+            self.tab_func.atualizar_estado(self.ativo, magnetometro_disponivel=dados["mag_status"] != 5)
             if self._calibracao_pendente and (
                     dados["mag_status"] == 1 or
-                    (dados["mag_status"] in (3, 4) and dados["mag_status"] != self._status_mag_no_pedido) or
+                    (dados["mag_status"] in (3, 4, 5) and dados["mag_status"] != self._status_mag_no_pedido) or
                     time.monotonic() - self._tempo_pedido_calibracao > 3.0):
                 self._calibracao_pendente = False
             self.tab_func.definir_calibracao_pendente(
@@ -227,7 +241,7 @@ class App:
                 self._janela_graficos.adicionar_dado(angulo, instante)
 
         if (not self._telemetria_limpa and self._ultima_telemetria
-                and time.monotonic() - self._ultima_telemetria > 0.5):
+                and time.monotonic() - self._ultima_telemetria > 2.0):
             self.tab_func.painel.limpar("TELEMETRIA DESATUALIZADA")
             self._telemetria_limpa = True
 

@@ -7,7 +7,7 @@ import time
 
 import customtkinter as ctk
 import numpy as np
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
 from config import KP_PADRAO, KI_PADRAO, KD_PADRAO, PASTA_LOGS
@@ -38,6 +38,7 @@ class JanelaGraficos(ctk.CTkToplevel):
         self.xs = []
         self.ys = []
         self.tamanho = 200
+        self._plot_dirty = True
         self.inicio = time.monotonic()
         self.inicio_referencia = 0.0
 
@@ -73,7 +74,7 @@ class JanelaGraficos(ctk.CTkToplevel):
                          border_color=COR_BORDA).pack(pady=(0, 4))
 
         e = estilo_botao()
-        ctk.CTkButton(ctrl, text="PID indisponível", state="disabled", **e).pack(pady=12)
+        ctk.CTkButton(ctrl, text="Enviar ganhos PID", command=self._enviar_pid, **e).pack(pady=12)
 
         #setpoint
         ctk.CTkLabel(ctrl, text="DEFINIÇÃO DE SETPOINT", font=("Arial Black", 12)).pack(pady=(15, 5))
@@ -95,6 +96,14 @@ class JanelaGraficos(ctk.CTkToplevel):
                       command=self._atualizar_referencia,
                       **e).pack(pady=12)
 
+        ctk.CTkButton(ctrl, text="Enviar referência ao drone",
+                      command=self._enviar_referencia_drone,
+                      **e).pack(pady=6)
+
+        ctk.CTkButton(ctrl, text="Parar referência no drone",
+                      command=self._parar_referencia_drone,
+                      **e).pack(pady=6)
+
         ctk.CTkButton(ctrl, text="Salvar gráfico",
                       command=self._salvar_grafico,
                       **e).pack(pady=6)
@@ -111,7 +120,8 @@ class JanelaGraficos(ctk.CTkToplevel):
         fr_graf.pack(side="left", fill="both", expand=True,
                      padx=10, pady=10)
 
-        self.fig, self.ax = plt.subplots(figsize=(8, 5))
+        self.fig = Figure(figsize=(8, 5), dpi=85)
+        self.ax = self.fig.add_subplot(111)
         self.ax.set_title("Roll medido x referência")
         self.ax.set_xlabel("Tempo (s)")
         self.ax.set_ylabel("Ângulo (°)")
@@ -120,7 +130,7 @@ class JanelaGraficos(ctk.CTkToplevel):
         self.linha_dados, = self.ax.plot([], [], linestyle='-',
                                          color="#1408BD", label="Roll medido")
         self.linha_sp, = self.ax.plot([], [], color="#DC2626",
-                                      label="Referência simulada")
+                                      label="Referência")
         self.ax.legend(loc="upper right")
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=fr_graf)
@@ -128,6 +138,12 @@ class JanelaGraficos(ctk.CTkToplevel):
         NavigationToolbar2Tk(self.canvas, fr_graf).update()
 
     #funções
+    def _enviar_pid(self):
+        if self.esp.enviar_pid(self.var_kp.get(), self.var_ki.get(), self.var_kd.get()):
+            self.lbl_status.configure(text="Ganhos enviados; aceitos só desarmado")
+        else:
+            self.lbl_status.configure(text="Falha ao enviar ganhos PID")
+
     def _atualizar_referencia(self):
         self.resposta = self.var_tipo.get()
         try:
@@ -138,10 +154,27 @@ class JanelaGraficos(ctk.CTkToplevel):
                 raise ValueError
             self.amplitude, self.periodo, self.xbase = a, p, x
             self.inicio_referencia = self.xs[-1] if self.xs else 0.0
+            self._plot_dirty = True
         except (TypeError, ValueError, OverflowError):
             self.lbl_status.configure(text="Parâmetros inválidos")
-            return
+            return False
         self.lbl_status.configure(text=f"Referência simulada: {self.resposta}")
+        return True
+
+    def _enviar_referencia_drone(self):
+        if not self._atualizar_referencia():
+            return
+        if self.esp.enviar_referencia(self.resposta, self.amplitude, self.periodo, self.xbase):
+            self.inicio_referencia = self.xs[-1] if self.xs else 0.0
+            self.lbl_status.configure(text="Referência enviada; use o controle de throttle")
+        else:
+            self.lbl_status.configure(text="Referência fora da faixa ou sem conexão")
+
+    def _parar_referencia_drone(self):
+        if self.esp.desativar_referencia():
+            self.lbl_status.configure(text="Referência desativada no drone")
+        else:
+            self.lbl_status.configure(text="Falha ao desativar a referência")
 
     def _salvar_grafico(self):
         try:
@@ -176,16 +209,19 @@ class JanelaGraficos(ctk.CTkToplevel):
         if len(self.ys) > self.tamanho:
             self.xs.pop(0)
             self.ys.pop(0)
+        self._plot_dirty = True
 
     #desenhar gráficos
     def _loop_desenho(self):
         if not self.winfo_exists():
             return
-        self._atualizar_plot()
-        self.after(50, self._loop_desenho)
+        if self._plot_dirty:
+            self._atualizar_plot()
+        self.after(100, self._loop_desenho)
 
     def _atualizar_plot(self):
         if len(self.xs) < 2:
+            self._plot_dirty = False
             return
 
         xs = self.xs
@@ -200,3 +236,4 @@ class JanelaGraficos(ctk.CTkToplevel):
         self.ax.relim()
         self.ax.autoscale_view()
         self.canvas.draw_idle()
+        self._plot_dirty = False

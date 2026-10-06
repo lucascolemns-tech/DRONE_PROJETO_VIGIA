@@ -129,7 +129,7 @@ class PainelTelemetria(ctk.CTkFrame):
         elif status_mag == 4:
             texto_mag, cor_mag = "Magnetômetro não detectado", "#B91C1C"
         elif status_mag == 5:
-            texto_mag, cor_mag = "Bússola desativada na configuração", "#6B7280"
+            texto_mag, cor_mag = "Bússola desabilitada no firmware", "#6B7280"
         else:
             texto_mag, cor_mag = "Bússola sem calibração", "#B45309"
         self.mag_status.configure(text=texto_mag, text_color=cor_mag)
@@ -137,11 +137,12 @@ class PainelTelemetria(ctk.CTkFrame):
         if not dados.get("link_ok", False):
             self.limpar("STM32 SEM TELEMETRIA")
             return
-        if not dados.get("sistema_pronto", False):
-            self.limpar("SENSORES INDISPONÍVEIS")
-            self.labels["tensao"].configure(text="N/A" if dados["tensao"] < 0 else f"{dados['tensao']:.2f}V")
-            return
-        self.link_status.configure(text="SENSORES OK", text_color="#15803D")
+        if dados.get("sistema_pronto", False):
+            self.link_status.configure(text="SENSORES OK", text_color="#15803D")
+        else:
+            # Dados válidos podem chegar mesmo quando o sistema não está pronto
+            # para armar, por exemplo enquanto a bússola não foi calibrada.
+            self.link_status.configure(text="DADOS OK · SISTEMA NÃO PRONTO", text_color="#B45309")
 
         # formato: ang_x, ang_y, ang_z, alt, vel, temp, m1, m2, m3, m4
         self.labels["roll"].configure(text=f"{dados['ang_x']:+.2f}°")

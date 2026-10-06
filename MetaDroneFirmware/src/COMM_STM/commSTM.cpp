@@ -68,6 +68,7 @@ void commSTM::UART_enviar(float ax, float ay, float az, float alt,
     SerialCom.write(HEADER_1);
     SerialCom.write(HEADER_2);
     SerialCom.write(buf, BYTES_ENVIADOS);
+    framesEnviados++;
 }
 
 
@@ -76,12 +77,8 @@ bool commSTM::UART_receber()
     while (SerialCom.available())
     {
         uint8_t b = SerialCom.read();
+        bytesRecebidos++;
         unsigned long agora = micros();
-        if (rx_state != 0 && agora - tempoUltimoByte > 5000)
-        {
-            rx_state = 0;
-            rx_idx = 0;
-        }
         tempoUltimoByte = agora;
         switch (rx_state)
         {
@@ -90,19 +87,22 @@ bool commSTM::UART_receber()
                 if (b == HEADER_1) rx_state = 1;
                 break;
             case 1:
-                if (b == HEADER_2) { rx_state = 2; rx_idx = 0; } //se os dois primeiros casos forem ok roda o funcionamento
+                if (b == HEADER_2) { rx_state = 2; rx_idx = 0; cabecalhosRecebidos++; } //se os dois primeiros casos forem ok roda o funcionamento
                 else
-                    rx_state = 0;
+                    rx_state = b == HEADER_1 ? 1 : 0;
                 break;
             case 2:
                 rx_buf[rx_idx++] = b;
                 if (rx_idx >= BYTES_RECEBIDOS)
                 {
                     rx_state = 0;
-                    uint16_t crc_recebido = (uint16_t)rx_buf[BYTES_RECEBIDOS - 2] |
+            uint16_t crc_recebido = (uint16_t)rx_buf[BYTES_RECEBIDOS - 2] |
                                             ((uint16_t)rx_buf[BYTES_RECEBIDOS - 1] << 8);
                     if (calcularCRC16(rx_buf, BYTES_RECEBIDOS - 2) != crc_recebido)
+                    {
+                        falhasCRC++;
                         break;
+                    }
                     comando[0] = bin_p_float(&rx_buf[0]);
                     comando[1] = bin_p_float(&rx_buf[4]);
                     comando[2] = bin_p_float(&rx_buf[8]);
@@ -111,9 +111,15 @@ bool commSTM::UART_receber()
                     comando[5] = bin_p_float(&rx_buf[20]);
                     tempoUltimoPacote = millis();
                     pronto = true;
+                    framesRecebidos++;
                 }
                 break;
         }
+    }
+    if (rx_state != 0 && !SerialCom.available() && micros() - tempoUltimoByte > 10000)
+    {
+        rx_state = 0;
+        rx_idx = 0;
     }
     if (pronto) { pronto = false; return true; }
     return false;

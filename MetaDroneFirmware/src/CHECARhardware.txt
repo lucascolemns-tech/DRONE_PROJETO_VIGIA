@@ -1,10 +1,10 @@
 META DRONE FIRMWARE - HARDWARE 
-  STM32: WeAct Studio BlackPill V2.0, STM32F411CE
+  STM32: BlackPill V2.0, STM32F411CE
   ESP32: DOIT ESP32 DEVKIT V1
 
 CONEXÕES STM32 
 ---------------------
-Function                  STM32 pin(s)       Connection / notes
+Função                    STM32              Conexões 
 ESC motor 1 signal        PA0                sinal esc, motor 1
 ESC motor 2 signal        PA1                sinal esc, motor 2
 ESC motor 3 signal        PA2                sinal esc, motor 3
@@ -25,9 +25,9 @@ I2C DISPOSITVOS QUE ESTÃO CONECTADOS À PB6 (SCL) e PB7 (SDA)
 ------------------------------------------------------------------
 Sensor                    Endereço           Notas
 HMC5883L-compatible mag   0x1E               é preciso o calibrar antes de rodar, SE estiver sendo utilizado
-INA219 battery monitor    0x40               monitoramento, módulo obrigatório
-BMP388 barometer          0x77               essencial para funcionamento do kalman e em consequência, módulo obrigatório   
-VL53L0X distance sensor   0x29 (7-bit)      driver usa 0x52 (8-bit); mede mm, aponta para baixo
+INA219 battery monitor    0x40               opcional; USAR_INA219=0 por padrão
+BMP180 barometer          0x77               essencial; endereço fixo; driver BMP180
+VL53L0X distance sensor   0x29               endereço I2C 7-bit; a API da biblioteca recebe 0x52
 
 CONEXÕES ESP32 
 ------------------------------------------------------------------

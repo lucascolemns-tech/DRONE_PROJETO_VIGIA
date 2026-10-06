@@ -3,6 +3,7 @@
 
 INA219_Sensor::INA219_Sensor(uint8_t addr) : ina(addr), _addr(addr) {}
 
+//inicializa o sensor 
 bool INA219_Sensor::init()
 {
     leitura_valida = false;
@@ -12,7 +13,7 @@ bool INA219_Sensor::init()
     ina.setCalibration_32V_2A(); //calibração pra faixa especificada
     return true;
 }
-
+//lê os valores do sensor
 bool INA219_Sensor::ler()
 {
     tensao = ina.getBusVoltage_V();

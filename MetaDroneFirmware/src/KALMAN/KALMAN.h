@@ -70,6 +70,15 @@ public:
   float getVel() const { return x[1]; }
   void setAlt(float h) { x[0] = h; }
   void setVel(float v) { x[1] = v; }
+  void reset(float altitude, float velocidade)
+  {
+    x[0] = altitude;
+    x[1] = velocidade;
+    chute_P[0][0] = 10.0f;
+    chute_P[0][1] = 0.0f;
+    chute_P[1][0] = 0.0f;
+    chute_P[1][1] = 10.0f;
+  }
 
 private:
   float Q_acc;

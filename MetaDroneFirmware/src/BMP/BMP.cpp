@@ -1,301 +1,246 @@
 #include "BMP.h"
 #include <math.h>
-#include <limits.h>
 
-#if defined(STM32_DEBUG_UART)
-extern Uart DebugSerial;
-#endif
+//variáveis globais de gerenciamento de tempo
+constexpr unsigned long BMP180_TEMPERATURE_CONVERSION_MS = 5;
+constexpr unsigned long BMP180_PRESSURE_CONVERSION_MS    = 8;
+constexpr unsigned long BMP180_TEMPERATURE_REFRESH_MS    = 1000;
+constexpr unsigned long BMP180_SAMPLE_STALE_MS           = 200;
 
-//curiosidade o underline antes da variavel é para dizer que é PRIVADO e EXCLUSIVA da classe
-BMP::BMP(uint8_t endereco)
-{
-  /*
-  porque não deixar o endereço fixo? Pois este bmp
-  tem dois endereços possíveis, é preciso que esta
-  parte possa transitar entre 0x76 e 0x77 e também se mantenha 
-  durante todo o código, para isto inicializamos ela como _endereco 
-  para que não se perca (caso fosse chamado somente endereco) ao final da chamada da classe
-  */
-   _endereco = endereco; 
-  temperatura = 0.0;
-  pressao = 0.0;
-  t_lin = 0.0;
-}
+//"static_cast" é usado quando váriaveis são dois tipos diferentes e deseja-se fzr uma opração entre
+int16_t  readS16(const uint8_t *p) { return static_cast<int16_t>(static_cast<uint16_t>(p[0]) << 8 | p[1]); }
+uint16_t readU16(const uint8_t *p) { return static_cast<uint16_t>(p[0]) << 8 | p[1]; }
 
-uint8_t BMP::lerRegistrador(uint8_t reg)
+//construtor, coloqe o endereço correto a ser analisado
+BMP::BMP(uint8_t endereco) : _endereco(endereco)
+{}
+
+bool BMP::lerRegistradores(uint8_t reg, uint8_t *buffer, uint8_t tamanho)
 {
   Wire.beginTransmission(_endereco);
-  Wire.write(reg);
+  Wire.write(reg); //você especifica o registrador q deseja
+  if (Wire.endTransmission() != 0)
+    return false; //checagem padrão i2c
 
-  if (Wire.endTransmission(false) != 0)
-    return 0xFF;
+  if (Wire.requestFrom(_endereco, tamanho) != tamanho)
+    return false; //pediu endeço e pediu o tanto qe vai retornar
 
-  uint8_t quantidade = Wire.requestFrom(_endereco, (uint8_t)1);
+  for (uint8_t i = 0; i < tamanho; ++i) //construir o buffer
+  {
+    if (!Wire.available())
+      return false;
+    buffer[i] = static_cast<uint8_t>(Wire.read()); //operações entre unsigned e signed values dos registradores do bmp180
+  }
+  return true;
+}
 
-  //devolver 1 byte do registrador
-  if (quantidade == 1 && Wire.available())
-    return Wire.read();
-
-  return 0xFF;
+bool BMP::lerRegistrador(uint8_t reg, uint8_t &valor)
+{
+  uint8_t data = 0;
+  if (!lerRegistradores(reg, &data, 1)) //caso não passe pelas checagem, retorna
+    return false;
+  valor = data; //valor lido no endereço do registrador salvo
+  return true;
 }
 
 bool BMP::escreverRegistrador(uint8_t reg, uint8_t valor)
 {
   Wire.beginTransmission(_endereco);
-  Wire.write(reg);
-  Wire.write(valor);
-  return Wire.endTransmission() == 0;
-}
-
-bool BMP::lerRegistradores(uint8_t reg, uint8_t *buffer, uint8_t tamanho)
-{
-  Wire.beginTransmission(_endereco);
-  Wire.write(reg);
-
-  //houve erro preencha todo o buffer com 0xFF
-  if (Wire.endTransmission(false) != 0)
-  {
-    for (uint8_t i = 0; i < tamanho; i++)
-      buffer[i] = 0xFF;
-    return false;
-  }
-
-  uint8_t quantidade = Wire.requestFrom(_endereco, tamanho);
-  if (quantidade != tamanho)
-  {
-    for (uint8_t i = 0; i < tamanho; i++)
-      buffer[i] = 0xFF;
-    return false;
-  }
-
-  //ler os registradores e salvar no buffer 
-  for (uint8_t i = 0; i < tamanho; i++)
-  {
-    if (Wire.available())
-      buffer[i] = Wire.read();
-    else
-    {
-      for (uint8_t j = i; j < tamanho; j++)
-        buffer[j] = 0xFF;
-      return false;
-    }
-  }
-  return true;
+  Wire.write(reg); //primeiro endereço
+  Wire.write(valor); //depois escreve o vaor
+  return Wire.endTransmission() == 0; //fecha bus i2c
 }
 
 bool BMP::lerCalibracao()
 {
-  //este algorítimo de calibração foi desenvolvido pela fabricante BOSCH
-  uint8_t buf[21];
+  uint8_t c[22]; //tottal de valores a serem salvos
+  if (!lerRegistradores(REG_CALIBRATION, c, sizeof(c)))
+      return false;
 
-  if (!lerRegistradores(CALIB, buf, 21))
-    return false;
+  ac1 = readS16(&c[0]); //lê 16 bits do endereço 0xAA e 0xAB, e assim por diante
+  ac2 = readS16(&c[2]);
+  ac3 = readS16(&c[4]);
+  ac4 = readU16(&c[6]);
+  ac5 = readU16(&c[8]);
+  ac6 = readU16(&c[10]);
+  b1  = readS16(&c[12]);
+  b2  = readS16(&c[14]);
+  mb  = readS16(&c[16]);
+  mc  = readS16(&c[18]);
+  md  = readS16(&c[20]);
 
-  bool todos_zero = true;
-  bool todos_um = true;
-  for (uint8_t i = 0; i < 21; i++)
-  {
-    if (buf[i] != 0x00) todos_zero = false;
-    if (buf[i] != 0xFF) todos_um = false;
-  }
-  if (todos_zero || todos_um)
-    return false;
-
-  uint16_t nvm_t1 = ((uint16_t)buf[1] << 8) | buf[0];
-  uint16_t nvm_t2 = ((uint16_t)buf[3] << 8) | buf[2];
-  int8_t nvm_t3 = (int8_t)buf[4];
-  int16_t nvm_p1 = (int16_t)(((uint16_t)buf[6] << 8) | buf[5]);
-  int16_t nvm_p2 = (int16_t)(((uint16_t)buf[8] << 8) | buf[7]);
-  int8_t nvm_p3 = (int8_t)buf[9];
-  int8_t nvm_p4 = (int8_t)buf[10];
-  uint16_t nvm_p5 = ((uint16_t)buf[12] << 8) | buf[11];
-  uint16_t nvm_p6 = ((uint16_t)buf[14] << 8) | buf[13];
-  int8_t nvm_p7 = (int8_t)buf[15];
-  int8_t nvm_p8 = (int8_t)buf[16];
-  int16_t nvm_p9 = (int16_t)(((uint16_t)buf[18] << 8) | buf[17]);
-  int8_t nvm_p10 = (int8_t)buf[19];
-  int8_t nvm_p11 = (int8_t)buf[20];
-
-  par_t1 = (double)nvm_t1 * 256.0;
-  par_t2 = (double)nvm_t2 / 1073741824.0;
-  par_t3 = (double)nvm_t3 / 281474976710656.0;
-  par_p1 = ((double)nvm_p1 - 16384.0) / 1048576.0;
-  par_p2 = ((double)nvm_p2 - 16384.0) / 536870912.0;
-  par_p3 = (double)nvm_p3 / 4294967296.0;
-  par_p4 = (double)nvm_p4 / 137438953472.0;
-  par_p5 = (double)nvm_p5 * 8.0;
-  par_p6 = (double)nvm_p6 / 64.0;
-  par_p7 = (double)nvm_p7 / 256.0;
-  par_p8 = (double)nvm_p8 / 32768.0;
-  par_p9 = (double)nvm_p9 / 281474976710656.0;
-  par_p10 = (double)nvm_p10 / 281474976710656.0;
-  par_p11 = (double)nvm_p11 / 36893488147419103232.0;
-  return nvm_t1 != 0 && nvm_t1 != 0xFFFF && nvm_t2 != 0 && nvm_t2 != 0xFFFF &&
-         nvm_p1 != 0 && isfinite(par_t1) && isfinite(par_t2) && isfinite(par_p1);
+  bool todosZERO = true;
+  bool todosUM = true;
+  //for "value : x" para cada valor do array c, verifica se todos são 0x00 ou 0xFF, repete a cada valor do array c
+  for (uint8_t value : c) { todosZERO = todosZERO && (value == 0x00); todosUM = todosUM && (value == 0xFF); }
+  bool checagem = (!todosZERO && !todosUM && ac4 != 0 && ac5 != 0 && ac6 != 0 && md != 0);
+  return checagem;
 }
 
-float BMP::compensarTemperatura(uint32_t raw_temp)
+bool BMP::iniciarTemperatura() //definir os parâmetros de tempo para conversão da temperatura, e iniciar a conversão
 {
-  //este algorítimo de compensação de temperatura foi desenvolvido pela fabricante BOSCH
-  double partial1;
-  double partial2;
-
-  partial1 = (double)raw_temp - par_t1;
-  partial2 = partial1 * par_t2;
-
-  t_lin = partial2 + (partial1 * partial1) * par_t3;
-
-  return (float)t_lin;
+  if (!escreverRegistrador(REG_CONTROL, REG_TEMP_COMMAND))
+    return false;
+  conversao           = Conversao_respectiva::Temperatura;
+  conversao_pronta_ms = millis() + BMP180_TEMPERATURE_CONVERSION_MS;
+  return true;
 }
 
-float BMP::compensarPressao(uint32_t raw_press)
+bool BMP::iniciarPressao() //definir os parâmetros de tempo para conversão da pressão, e iniciar a conversão
 {
-  //este algorítimo de compensação de pressão foi desenvolvido pela fabricante BOSCH
-  double p = (double)raw_press;
-  double t = t_lin;
+  if (!escreverRegistrador(REG_CONTROL, static_cast<uint8_t>(0x34 | (OSS << 6)))) //definir modo
+    return false; //valida dados dos registradores
+  conversao = Conversao_respectiva::Pressao; //retorna objeto
+  conversao_pronta_ms = millis() + BMP180_PRESSURE_CONVERSION_MS;
+  return true;
+}
 
-  double partial_data1;
-  double partial_data2;
-  double partial_data3;
-  double partial_data4;
+//formula para compensar temperatrura
+bool BMP::concluirTemperatura()
+{
+  uint8_t brutalidade[2]; //valores brutos
+  if (!lerRegistradores(REG_DATA, brutalidade, sizeof(brutalidade)))
+    return false;
 
-  double partial_out1;
-  double partial_out2;
-
-  //primeiro termo
-  partial_data1 = par_p6 * t;
-  partial_data2 = par_p7 * (t * t);
-  partial_data3 = par_p8 * (t * t * t);
+  const int32_t uncompensatedTemperature = static_cast<int32_t>(static_cast<uint16_t>(brutalidade[0]) << 8 | brutalidade[1]);
+  const int64_t x1 = (static_cast<int64_t>(uncompensatedTemperature - ac6) * ac5) >> 15;
+  const int64_t denominador = x1 + md;
   
-  partial_out1 = par_p5 + partial_data1 + partial_data2 + partial_data3;
+  if (denominador == 0) //evitar divisão por 0
+    return false;
 
-  //segundo termo
-  partial_data1 = par_p2 * t;
-  partial_data2 = par_p3 * (t * t);
-  partial_data3 = par_p4 * (t * t * t);
-    
-  partial_out2 = p * (par_p1 + partial_data1 + partial_data2 + partial_data3);
+  const int64_t x2 = (static_cast<int64_t>(mc) << 11) / denominador;
+  const int64_t newB5 = x1 + x2;
+  if (newB5 < INT32_MIN || newB5 > INT32_MAX)
+    return false; //não permite que ultrapase valores 
 
-  //terceiro termo
-  partial_data1 = p * p;
-  partial_data2 = par_p9 + par_p10 * t;
-  partial_data3 = partial_data1 * partial_data2;
-  partial_data4 = partial_data3 +(pow(p, 3)) * par_p11;
+  b5 = static_cast<int32_t>(newB5); //operações entre valores unsigned e signed
+  const int32_t temperaturaT = (b5 + 8) >> 4;
+  temperatura           = static_cast<float>(temperaturaT) / 10.0f;
+  ultima_temperatura_ms = millis();
+  return isfinite(temperatura) && temperatura >= -40.0f && temperatura <= 85.0f; //verifica se o valor é real
+}
 
-  //resultado
-  double press = partial_out1 + partial_out2 + partial_data4;
-  return (float)press;
+//função para compensar a pressão, com base na temperatura
+bool BMP::concluirPressao()
+{
+  uint8_t brutalidade[3];
+  if (!lerRegistradores(REG_DATA, brutalidade, sizeof(brutalidade)))
+    return false;
+
+  const uint32_t uncompensatedPressure =
+    ((static_cast<uint32_t>(brutalidade[0]) << 16) |
+    (static_cast<uint32_t>(brutalidade[1]) << 8)  |
+    static_cast<uint32_t>(brutalidade[2])) >> (8 - OSS); //modo de obter dados dos registradores
+
+  const int64_t b6 = static_cast<int64_t>(b5) - 4000;
+  int64_t x1 = (static_cast<int64_t>(b2) * ((b6 * b6) >> 12)) >> 11;
+  int64_t x2 = (static_cast<int64_t>(ac2) * b6) >> 11;
+  int64_t x3 = x1 + x2;
+  const int64_t b3 = (((static_cast<int64_t>(ac1) * 4 + x3) << OSS) + 2) >> 2;
+
+  x1 = (static_cast<int64_t>(ac3) * b6) >> 13;
+  x2 = (static_cast<int64_t>(b1) * ((b6 * b6) >> 12)) >> 16;
+  x3 = (x1 + x2 + 2) >> 2;
+
+  const int64_t b4Factor = x3 + 32768;
+  if (b4Factor <= 0)
+    return false;
+
+  const uint64_t b4 = (static_cast<uint64_t>(ac4) * static_cast<uint64_t>(b4Factor)) >> 15;
+  if (b4 == 0 || b3 < 0 || uncompensatedPressure < static_cast<uint64_t>(b3))
+    return false;
+
+  const uint64_t b7 = (static_cast<uint64_t>(uncompensatedPressure) - static_cast<uint64_t>(b3)) * (50000U >> OSS);
+  int64_t pressure = (b7 < 0x80000000ULL) ? static_cast<int64_t>((b7 * 2U) / b4) : static_cast<int64_t>((b7 / b4) * 2U);
+
+  x1 = ((pressure >> 8) * (pressure >> 8) * 3038) >> 16;
+  x2 = (-7357 * pressure) >> 16;
+  pressure += (x1 + x2 + 3791) >> 4;
+
+  if (pressure < 30000 || pressure > 120000)
+    return false;
+
+  pressao                 = static_cast<float>(pressure);
+  tempo_ultima_amostra_ms = millis();
+  amostra_valida          = true;
+  return isfinite(pressao);
 }
 
 bool BMP::inicializar()
-{ 
-  _temAmostra = false;
-  _ultimaAmostraMs = 0;
-  Wire.beginTransmission(_endereco);
+{
+  amostra_valida = false;
+  temperatura = 0.0f;
+  pressao = 0.0f;
+  conversao = Conversao_respectiva::None; //atribui o valor de conversão como nenhum, para que seja iniciado a conversão de temperatura e pressão
+  _endereco = BMP180_I2C_ADDRESS; //força o endereço padrão, é meio q para caso tenha passado o endereço errado no construtor
+  uint8_t id = 0;
 
-  if (Wire.endTransmission() != 0)
+  if (!lerRegistrador(REG_CHIP_ID, id))
   {
-#if defined(STM32_DEBUG_UART)
-    DebugSerial.print("BMP388 nao encontrado em 0x");
-    DebugSerial.println(_endereco, HEX);
-#endif
+  #if defined(STM32_DEBUG_UART)
+    Serial.println("BMP180 NACK em 0x77"); //retornar o valor lido pela função de chamada
+  #endif
     return false;
   }
 
-  uint8_t id = lerRegistrador(REG_CHIP_ID);
-#if defined(STM32_DEBUG_UART)
-  DebugSerial.print("BMP388 encontrado em 0x");
-  DebugSerial.println(_endereco, HEX);
-  DebugSerial.print("CHIP_ID = 0x");
-
- //garantir que sejam exibidos sempre dois digitos, se for menor que 16 exibe so um
-  if (id < 0x10)
-    DebugSerial.print("0");
-
-  DebugSerial.println(id, HEX);
-#endif
-
-  if (id != BMP_ID)
+  if (id != BMP180_CHIP_ID)
   {
-#if defined(STM32_DEBUG_UART)
-    DebugSerial.println("CHIP_ID incorreto!");
-#endif
+  #if defined(STM32_DEBUG_UART)
+    Serial.print("BMP180 chip ID incorreto: 0x");
+    if (id < 0x10) Serial.print('0');
+    Serial.println(id, HEX);
+  #endif
     return false;
   }
 
   if (!lerCalibracao())
   {
-#if defined(STM32_DEBUG_UART)
-    DebugSerial.println("Calibracao BMP invalida!");
-#endif
+  #if defined(STM32_DEBUG_UART)
+    Serial.println("BMP180 calibracao invalida");
+  #endif
     return false;
   }
 
-  if (!escreverRegistrador(OSR, 0x03) ||       // pressão x8, temperatura x1
-      !escreverRegistrador(REG_CONFIG, 0x00) || // filtro IIR desligado
-      !escreverRegistrador(ODR, 0x00) ||        // ODR 200 Hz
-      !escreverRegistrador(PWR_CTRL, 0x33))     // pressão + temperatura, modo normal
-  {
-#if defined(STM32_DEBUG_UART)
-    DebugSerial.println("Falha ao escrever configuração do BMP388");
-#endif
-    return false;
-  }
-
-  if (lerRegistrador(OSR) != 0x03 || lerRegistrador(REG_CONFIG) != 0x00 ||
-      lerRegistrador(ODR) != 0x00 || lerRegistrador(PWR_CTRL) != 0x33)
-  {
-#if defined(STM32_DEBUG_UART)
-    DebugSerial.println("Readback de configuração BMP388 divergente");
-#endif
-    return false;
-  }
-
-#if defined(STM32_DEBUG_UART)
-  DebugSerial.println("BMP388 configurado; aguardando primeira amostra");
-#endif
-  return true;
+  #if defined(STM32_DEBUG_UART)
+    Serial.println("BMP180 detectado (ID=0x55), OSS=1"); //endereço padrão, modo de operação
+  #endif
+    return iniciarTemperatura();
 }
 
 bool BMP::lerBMP()
 {
-  uint8_t status = lerRegistrador(REG_STATUS);
+    //gerenciamento de tempo
+    const unsigned long now = millis();
+    const bool amostra_fresca = amostra_valida && (now - tempo_ultima_amostra_ms) <= BMP180_SAMPLE_STALE_MS;
 
-  if (status == 0xFF)
+    if (conversao == Conversao_respectiva::None) //atribui o valor de conversão como nenhum, para que seja iniciado a conversão de temperatura e pressão
+    {
+      const bool iniciado =
+          (now - ultima_temperatura_ms >= BMP180_TEMPERATURE_REFRESH_MS)
+              ? iniciarTemperatura() : iniciarPressao(); //gerencia o tempo que vai ler a temperatura e a pressão, se o tempo de leitura da temperatura for maior que 1s, inicia a leitura da temperatura, caso contrário, inicia a leitura da pressão
+      return iniciado || amostra_fresca; //após a conversão, retorna se a amostra é válida ou não
+    }
+
+    if (static_cast<int32_t>(now - conversao_pronta_ms) < 0)
+      return amostra_fresca; //retorna se a amostra válida ou não
+
+    const Conversao_respectiva completed = conversao;
+    conversao = Conversao_respectiva::None; //atribui um objeto vazio à conversão, para que seja iniciado a conversão de temperatura e pressão
+
+    if (completed == Conversao_respectiva::Temperatura)
+    {
+      if (!concluirTemperatura() || !iniciarPressao())
+        return false;
+      return amostra_fresca;
+    }
+
+    if (completed == Conversao_respectiva::Pressao)
+    {
+      if (!concluirPressao())
+        return false;
+      const bool iniciado = (millis() - ultima_temperatura_ms >= BMP180_TEMPERATURE_REFRESH_MS) ? iniciarTemperatura() : iniciarPressao();
+      return iniciado;
+    }
     return false;
-
-  // Data-ready pode estar momentaneamente limpo entre conversões; isso não é
-  // falha do sensor. O chamador verifica a idade da última amostra válida.
-  if ((status & 0x60) != 0x60)
-    return true;
-
-  uint8_t dados[6];
-  if (!lerRegistradores(REG_DATA, dados, 6))
-    return false;
-
-  uint32_t press_bruta = ((uint32_t)dados[2] << 16) | ((uint32_t)dados[1] << 8) | dados[0];
-  uint32_t temp_bruta  = ((uint32_t)dados[5] << 16) | ((uint32_t)dados[4] << 8) | dados[3];
-
-  float nova_temperatura = compensarTemperatura(temp_bruta);
-  float nova_pressao = compensarPressao(press_bruta);
-  if (!isfinite(nova_temperatura) || !isfinite(nova_pressao) ||
-      nova_temperatura < -40.0f || nova_temperatura > 85.0f ||
-      nova_pressao < 30000.0f || nova_pressao > 120000.0f)
-    return false;
-
-  temperatura = nova_temperatura;
-  pressao = nova_pressao;
-  _ultimaAmostraMs = millis();
-  _temAmostra = true;
-  return true;
-}
-
-bool BMP::amostraRecente(unsigned long idadeMaximaMs) const
-{
-  return _temAmostra && (millis() - _ultimaAmostraMs <= idadeMaximaMs);
-}
-
-unsigned long BMP::idadeAmostraMs() const
-{
-  return _temAmostra ? millis() - _ultimaAmostraMs : ULONG_MAX;
 }
