@@ -1,4 +1,5 @@
 #include "PID.h"
+#include <esc_range.h>
 
 /*
         Frente
@@ -85,31 +86,31 @@ void PID::RunPID(bool X, bool Y, bool Z, bool H)
 double PID::GetM1()
 {
     M1 = BaseThrottle + Xoutput - Youtput + Zoutput + Houtput;
-    if (M1 < 1000) M1 = 1000;
-    if (M1 > 2000) M1 = 2000;
+    if (M1 < ESC_MIN_US) M1 = ESC_MIN_US;
+    if (M1 > ESC_MAX_US) M1 = ESC_MAX_US;
     return M1;
 }
 
 double PID::GetM2()
 {
     M2 = BaseThrottle - Xoutput - Youtput - Zoutput + Houtput;
-    if (M2 < 1000) M2 = 1000;
-    if (M2 > 2000) M2 = 2000;
+    if (M2 < ESC_MIN_US) M2 = ESC_MIN_US;
+    if (M2 > ESC_MAX_US) M2 = ESC_MAX_US;
     return M2;
 }
 
 double PID::GetM3()
 {
     M3 = BaseThrottle + Xoutput + Youtput - Zoutput + Houtput;
-    if (M3 < 1000) M3 = 1000;
-    if (M3 > 2000) M3 = 2000;
+    if (M3 < ESC_MIN_US) M3 = ESC_MIN_US;
+    if (M3 > ESC_MAX_US) M3 = ESC_MAX_US;
     return M3;
 }
 
 double PID::GetM4()
 {
     M4 = BaseThrottle - Xoutput + Youtput + Zoutput + Houtput;
-    if (M4 < 1000) M4 = 1000;
-    if (M4 > 2000) M4 = 2000;
+    if (M4 < ESC_MIN_US) M4 = ESC_MIN_US;
+    if (M4 > ESC_MAX_US) M4 = ESC_MAX_US;
     return M4;
 }

@@ -173,13 +173,13 @@ void MPU6500::MPUcalculos(float mag_x, float mag_y, float mag_z, bool mag_valido
   float convertido_gyro_y = ((float)gyro_y - media_gyro_y) / 131.0f;
   float convertido_gyro_z = ((float)gyro_z - media_gyro_z) / 131.0f;
 
-  //chamada do filtro da AHRS, e decide a configuração 9DOF (+ magnetometro) OU 6DOF sem magnetometro.
+  //chamada do filtro da AHRS, e decide a configuração 9DOF (+ magnetometro) OU 6DOF sem magnetometro
   if (mag_valido)
     filter.update(convertido_gyro_x, convertido_gyro_y, convertido_gyro_z,
-                  ax_g, ay_g, az_g, mag_x, mag_y, mag_z, dt);
+                  ax_g, ay_g, az_g, mag_x, mag_y, mag_z, dt); //9 dof
   else
     filter.updateIMU(convertido_gyro_x, convertido_gyro_y, convertido_gyro_z,
-                     ax_g, ay_g, az_g, dt);
+                     ax_g, ay_g, az_g, dt); //6 dof
 
   angulo_x = filter.getRoll();
   angulo_y = filter.getPitch();

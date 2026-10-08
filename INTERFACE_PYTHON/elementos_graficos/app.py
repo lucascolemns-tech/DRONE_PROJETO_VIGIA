@@ -11,10 +11,7 @@ from config import (
     WINDOW_W, WINDOW_H, WINDOW_TITULO, ICONE_IMG,
 )
 from nucleo import ESPCom, ControleHardware, processar_dados_esp
-from .tema import (COR_TAB_FUNDO, COR_TAB_NAO_SEL, COR_TAB_HOVER,
-                    COR_TAB_SEL, COR_TAB_SEL_HOV, COR_TAB_TEXTO)
-from .tabs import TabOperacao, TabPID
-from .janelaPID import abrir_janela_pid
+from .tabs import TabOperacao
 from .janelaCAM import abrir_janela_camera
 from .janelaGRAFICO import JanelaGraficos
 
@@ -48,25 +45,8 @@ class App:
         self._centralizar()
         self._aplicar_icone()
 
-        barra = ctk.CTkTabview(
-            master=self.window, height=15, corner_radius=8,
-            fg_color=COR_TAB_FUNDO,
-            segmented_button_fg_color=COR_TAB_NAO_SEL,
-            segmented_button_selected_color=COR_TAB_SEL,
-            segmented_button_selected_hover_color=COR_TAB_SEL_HOV,
-            segmented_button_unselected_color=COR_TAB_NAO_SEL,
-            segmented_button_unselected_hover_color=COR_TAB_HOVER,
-            text_color=COR_TAB_TEXTO, anchor="w", state="normal",
-        )
-        tab1 = barra.add("FUNCIONAMENTO")
-        tab2 = barra.add("REGULAGEM PID")
-        barra.pack(fill="x", side="top", pady=10)
-
-        self.tab_func = TabOperacao(tab1, self)
+        self.tab_func = TabOperacao(self.window, self)
         self.tab_func.pack(fill="both", expand=True)
-
-        self.tab_pid = TabPID(tab2, self)
-        self.tab_pid.pack(fill="both", expand=True)
         self.window.after(50, self._processar_fila_telemetria)
 
     #função para a janela principal abrir exatamente no centro da sua tela do monitor
@@ -144,9 +124,6 @@ class App:
     #comunicação camera
     def abrir_camera(self):
         abrir_janela_camera(self.window, CAMERA_URL)
-
-    def abrir_pid(self):
-        abrir_janela_pid(self.window, self.esp)
 
     def abrir_graficos(self):
         if self._janela_graficos is not None and self._janela_graficos.winfo_exists():
@@ -249,7 +226,6 @@ class App:
 
     def _atualizar_botoes(self, conectado):
         self.tab_func.atualizar_estado(conectado)
-        self.tab_pid.atualizar_estado(conectado)
 
     def run(self):
         self.window.mainloop()

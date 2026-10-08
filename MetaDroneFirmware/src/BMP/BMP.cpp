@@ -178,28 +178,28 @@ bool BMP::inicializar()
 
   if (!lerRegistrador(REG_CHIP_ID, id))
   {
-  #if defined(STM32_DEBUG_UART)
-    Serial.println("BMP180 NACK em 0x77"); //retornar o valor lido pela função de chamada
-  #endif
-    return false;
+    #if defined(STM32_DEBUG_UART)
+      Serial.println("BMP180 NACK em 0x77"); //retornar o valor lido pela função de chamada
+    #endif
+      return false;
   }
 
   if (id != BMP180_CHIP_ID)
   {
-  #if defined(STM32_DEBUG_UART)
-    Serial.print("BMP180 chip ID incorreto: 0x");
-    if (id < 0x10) Serial.print('0');
-    Serial.println(id, HEX);
-  #endif
-    return false;
+    #if defined(STM32_DEBUG_UART)
+      Serial.print("BMP180 chip ID incorreto: 0x");
+      if (id < 0x10) Serial.print('0');
+      Serial.println(id, HEX);
+    #endif
+      return false;
   }
 
   if (!lerCalibracao())
   {
-  #if defined(STM32_DEBUG_UART)
-    Serial.println("BMP180 calibracao invalida");
-  #endif
-    return false;
+    #if defined(STM32_DEBUG_UART)
+      Serial.println("BMP180 calibracao invalida");
+    #endif
+      return false;
   }
 
   #if defined(STM32_DEBUG_UART)

@@ -15,6 +15,7 @@ class TabOperacao(ctk.CTkFrame):
             "calibrar":  False,
             "finalizar": False,
             "camera":    True,
+            "graficos":  False,
         }
 
         #coluna esquerda: botões
@@ -45,10 +46,12 @@ class TabOperacao(ctk.CTkFrame):
         self.btn_calibrar.configure(state="disabled")
         self.btn_finalizar = ctk.CTkButton(esq, text="finalizar comm", command=self._clicou_finalizar, **e)
         self.btn_camera = ctk.CTkButton(esq, text="exibir camera", command=self._clicou_camera, **e)
+        self.btn_graficos = ctk.CTkButton(esq, text="def gráficos", command=app.abrir_graficos, **e)
+        self.btn_graficos.configure(state="disabled")
 
         #implementarpara cada botão
         for b in (self.btn_conectar, self.btn_manual, self.btn_teste, self.btn_calibrar,
-                  self.btn_finalizar, self.btn_camera):
+                  self.btn_finalizar, self.btn_camera, self.btn_graficos):
             b.pack(fill="x")
 
         self._atualizar_aparencia()
@@ -87,6 +90,7 @@ class TabOperacao(ctk.CTkFrame):
             "calibrar":  self.btn_calibrar,
             "finalizar": self.btn_finalizar,
             "camera":    self.btn_camera,
+            "graficos":  self.btn_graficos,
         }
 
         for chave, botao in mapa.items():
@@ -103,7 +107,9 @@ class TabOperacao(ctk.CTkFrame):
         self._habilitados["teste"]     = False
         self._habilitados["calibrar"]  = conectado and magnetometro_disponivel
         self._habilitados["finalizar"] = conectado
+        self._habilitados["graficos"]  = conectado
         self.btn_calibrar.configure(state="normal" if self._habilitados["calibrar"] else "disabled")
+        self.btn_graficos.configure(state="normal" if self._habilitados["graficos"] else "disabled")
         # btn_camera permanece sempre habilitado, igual ao monolítico
         self._atualizar_aparencia()
 

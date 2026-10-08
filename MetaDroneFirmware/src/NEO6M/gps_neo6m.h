@@ -1,5 +1,5 @@
-#ifndef GPS_NEO6M_H
-#define GPS_NEO6M_H
+#ifndef NEO6M_H
+#define NEO6M_H
 
 #include <Arduino.h>
 #include <TinyGPSPlus.h>

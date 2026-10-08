@@ -25,7 +25,6 @@ I2C DISPOSITVOS QUE ESTÃO CONECTADOS À PB6 (SCL) e PB7 (SDA)
 ------------------------------------------------------------------
 Sensor                    Endereço           Notas
 HMC5883L-compatible mag   0x1E               é preciso o calibrar antes de rodar, SE estiver sendo utilizado
-INA219 battery monitor    0x40               opcional; USAR_INA219=0 por padrão
 BMP180 barometer          0x77               essencial; endereço fixo; driver BMP180
 VL53L0X distance sensor   0x29               endereço I2C 7-bit; a API da biblioteca recebe 0x52
 

@@ -7,8 +7,8 @@
 INTERNET_ESP_H::INTERNET_ESP_H()
      : rede("Colem"),          
       pass("lucas2007"),       
-      local_IP(10, 85, 164, 132), // deve corresponder ao IP usado pela interface TCP
-      gateway(10, 85, 164, 172), 
+      local_IP(10, 200, 79, 132), // deve corresponder ao IP usado pela interface TCP
+      gateway(10, 200, 79, 29), 
       subnet(255, 255, 255, 0),       
       server(SERVER_PORT)
 {}
@@ -20,7 +20,7 @@ void INTERNET_ESP_H::internet_init()
   WiFi.setAutoReconnect(true);
   if (!WiFi.config(local_IP, gateway, subnet))
   {
-    Serial.println("FALHA CONFIGURAR IP ESTATICO: 10.85.164.132/24 gateway 10.85.164.172");
+    Serial.println("FALHA CONFIGURAR IP ESTATICO: 10.200.79.132/24 gateway 10.200.79.29");
     return;
   }
 
@@ -339,4 +339,3 @@ String INTERNET_ESP_H::internet_receber()
 
   return "";
 }
-
