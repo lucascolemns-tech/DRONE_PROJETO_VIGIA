@@ -8,8 +8,10 @@
 #define HEADER_2 0x55
 #define BYTES_ENVIADOS 26 //32 bytes são um float
 #define BYTES_RECEBIDOS 62
-#define UART_TX_PIN 17
-#define UART_RX_PIN 16
+// AI-Thinker ESP32-CAM UART0 pins remapped for the STM32 link.
+// Disconnect the STM32 UART while flashing/debugging over the USB-UART adapter.
+#define UART_TX_PIN 1
+#define UART_RX_PIN 3
 
 class commESP
 {

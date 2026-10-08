@@ -6,7 +6,7 @@ DIRETORIO_RAIZ = os.path.dirname(os.path.abspath(__file__))
 ESP_IP         = os.environ.get("META_DRONE_ESP_HOST", os.environ.get("META_DRONE_ESP_IP", "10.200.79.132"))
 ESP_PORT       = 1244
 SOCKET_TIMEOUT = 0.25
-CAMERA_URL     = "http://192.168.1.19:81/stream"
+CAMERA_URL     = f"http://{ESP_IP}:81/stream"
 
 CONTROLE_EXE = os.path.join(DIRETORIO_RAIZ, "ferramentas", "controle_precision.exe")
 ICONE_IMG    = os.path.join(DIRETORIO_RAIZ, "VIGIA.ico")

@@ -10,5 +10,4 @@ void setup()
 void loop()
 {
     firmwareESP.rodar();
-    firmwareESP.debug_serial();
 }

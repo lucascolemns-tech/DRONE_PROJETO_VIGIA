@@ -1,5 +1,6 @@
 #include "auxiliarESP.h"
 #include <esc_range.h>
+#include <cameraESP.h>
 
 //checagem inicial do estado do WiFi e do cliente TCP
 bool AUX_ESP::wifi_ok()
@@ -527,13 +528,14 @@ void AUX_ESP::debug_serial()
 // ===================== antigo setup() =====================
 void AUX_ESP::iniciar()
 {
-    Serial.begin(115200);
-    if (esc.armarESC())
-        Serial.println("ESP32 ESC PWM started: 50Hz, 1000us minimum, arming for 8 seconds");
-    else
-        Serial.println("ESP32 ESC PWM attach failed; motors held at minimum");
+    // UART0 GPIO1/GPIO3 are assigned to the STM32 link, so do not initialize
+    // Serial or print diagnostics on those pins.
+    // Keep servo PWM on LEDC timer 0; camera XCLK uses timer 3/channel 7.
+    ESP32PWM::allocateTimer(0);
+    esc.armarESC();
     cspi.UART_init();
     internet.internet_init();
+    cameraESP_iniciar();
 }
 
 // ===================== antigo loop() =====================

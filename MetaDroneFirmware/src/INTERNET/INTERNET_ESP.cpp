@@ -8,8 +8,8 @@ INTERNET_ESP_H::INTERNET_ESP_H()
      : rede("Colem"),          
       pass("lucas2007"),       
       local_IP(10, 200, 79, 132), // deve corresponder ao IP usado pela interface TCP
-      gateway(10, 200, 79, 29), 
-      subnet(255, 255, 255, 0),       
+      gateway(10, 200, 79, 29),
+      subnet(255, 255, 255, 0),
       server(SERVER_PORT)
 {}
 
@@ -20,20 +20,8 @@ void INTERNET_ESP_H::internet_init()
   WiFi.setAutoReconnect(true);
   if (!WiFi.config(local_IP, gateway, subnet))
   {
-    Serial.println("FALHA CONFIGURAR IP ESTATICO: 10.200.79.132/24 gateway 10.200.79.29");
     return;
   }
-
-  WiFi.onEvent([](arduino_event_id_t event, arduino_event_info_t info)
-  {
-    if (event == ARDUINO_EVENT_WIFI_STA_DISCONNECTED)
-    {
-      const uint8_t motivo = info.wifi_sta_disconnected.reason;
-      Serial.printf("Wi-Fi desconectado: motivo=%u (%s)\n",
-                    static_cast<unsigned>(motivo),
-                    WiFi.disconnectReasonName(static_cast<wifi_err_reason_t>(motivo)));
-    }
-  });
 
   WiFi.begin(rede, pass);
 
@@ -45,14 +33,6 @@ void INTERNET_ESP_H::internet_init()
   if (wifiConectado)
   {
     server.begin();
-    Serial.println("\nWiFi conectado!");
-    Serial.print("IP: ");
-    Serial.println(WiFi.localIP());
-    Serial.printf("Servidor TCP iniciado na porta %d\n", SERVER_PORT);
-  }
-  else
-  {
-    Serial.printf("FALHA CONECTAR WIFI (status=%d)\n", static_cast<int>(WiFi.status()));
   }
 
   tempoRetryWifi = millis();
@@ -72,9 +52,6 @@ void INTERNET_ESP_H::internet_manterConexao()
     {
       wifiConectado = true;
       server.begin();
-      Serial.print("WiFi reconectado. IP: ");
-      Serial.println(WiFi.localIP());
-      Serial.printf("Servidor TCP iniciado na porta %d\n", SERVER_PORT);
     }
     return;
   }
@@ -96,8 +73,6 @@ void INTERNET_ESP_H::internet_manterConexao()
   if (millis() - tempoRetryWifi >= 5000)
   {
     tempoRetryWifi = millis();
-    Serial.printf("Wi-Fi desconectado (status=%d); nova tentativa\n",
-                  static_cast<int>(WiFi.status()));
     WiFi.reconnect();
   }
 }
@@ -122,11 +97,9 @@ void INTERNET_ESP_H::internet_verificarCliente()
     if (clienteAtivo && cliente.connected() && millis() - ultimoRxTcpMs <= 1000)
     {
       novoCliente.stop();
-      Serial.println("Novo cliente TCP recusado; sessao atual ainda recebe comandos");
       return;
     }
 
-    const bool substituiuCliente = clienteAtivo;
     cliente.stop();
     cliente = novoCliente;
     cliente.setNoDelay(true);
@@ -140,9 +113,6 @@ void INTERNET_ESP_H::internet_verificarCliente()
     tempoUltimoProgressoTx = 0;
     ultimoRxTcpMs = millis();
     ++idSessao;
-    Serial.println(substituiuCliente
-                       ? "Novo cliente TCP aceito; sessao anterior substituida"
-                       : "Novo cliente TCP aceito");
     return;
   }
 
@@ -157,7 +127,6 @@ void INTERNET_ESP_H::internet_verificarCliente()
     linhasTxAcumuladas = 0;
     txPronto = false;
     tempoUltimoProgressoTx = 0;
-    Serial.println("Cliente TCP desconectado; aguardando reconexao");
   }
 }
 
@@ -169,7 +138,6 @@ void INTERNET_ESP_H::internet_enviar(const char* dados)
   size_t tamanho = strlen(dados);
   if (tamanho + 1 > sizeof(bufferTx) / 2)
   {
-    Serial.println("TCP: linha de telemetria maior que o limite do lote");
     cliente.stop();
     clienteAtivo = false;
     tamanhoTx = 0;
@@ -220,7 +188,6 @@ void INTERNET_ESP_H::internet_tentarEnviar()
   // Python receiver sees EOF and reconnects instead of waiting on stale data.
   if (millis() - tempoUltimoProgressoTx > 750)
   {
-    Serial.println("TCP: sem progresso de envio; descartando telemetria pendente");
     cliente.stop();
     clienteAtivo = false;
     tamanhoTx = 0;
@@ -272,7 +239,6 @@ void INTERNET_ESP_H::internet_tentarEnviar()
 
   if (enviados == 0 || enviados < 0)
   {
-    Serial.printf("TCP: falha de envio (errno=%d); aguardando reconexao\n", erroEnvio);
     cliente.stop();
     clienteAtivo = false;
     tamanhoTx = 0;

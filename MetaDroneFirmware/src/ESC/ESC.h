@@ -8,9 +8,11 @@
 
 #include <ESP32Servo.h>
 
-#define PINO_M1 32
+// AI-Thinker ESP32-CAM: GPIO4 is also the flash LED output; microSD is unused.
+#define PINO_M1 4
 #define PINO_M2 13
-#define PINO_M3 33
+#define PINO_M3 14
+// GPIO15 is a boot-strapping pin; keep the ESC signal input high-impedance at reset.
 #define PINO_M4 15
 
 #define ESC_FREQ_HZ 50
