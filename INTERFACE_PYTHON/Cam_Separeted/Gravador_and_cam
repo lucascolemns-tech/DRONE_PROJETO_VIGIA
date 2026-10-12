@@ -1,0 +1,359 @@
+"""
+import socket
+import struct
+import cv2
+import numpy as np
+import threading
+import time
+
+HOST = "0.0.0.0"
+PORT = 1224
+MAX_IMAGE_SIZE = 4_000_000
+RECV_TIMEOUT = 15
+
+latest_frame = None
+latest_lock = threading.Lock()
+running = True
+
+def receive_exactly(conn, size):
+    data = bytearray()
+    while len(data) < size:
+        chunk = conn.recv(size - len(data))
+        if not chunk:
+            return None
+
+        data.extend(chunk)
+
+    return data
+
+
+def receiver(conn):
+    global latest_frame, running
+
+    conn.settimeout(RECV_TIMEOUT)
+
+    try:
+        while running:
+            header = receive_exactly(conn, 4)
+
+            if header is None:
+                break
+
+            image_size = struct.unpack("!I", header)[0]
+
+            if not 0 < image_size <= MAX_IMAGE_SIZE:
+                print(f"Tamanho inválido: {image_size}")
+                break
+            jpeg_data = receive_exactly(conn, image_size)
+
+            if jpeg_data is None:
+                break
+
+            encoded = np.frombuffer(jpeg_data, dtype=np.uint8)
+            frame = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+
+            if frame is not None:
+                with latest_lock:
+                    latest_frame = frame
+
+    except (OSError, ValueError) as error:
+        print(f"Erro na recepção: {error}")
+
+    finally:
+        running = False
+def main():
+    global running
+
+    running = True
+
+    janela = "ESP32-CAM - TCP"
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server:
+        server.setsockopt(
+            socket.SOL_SOCKET,
+            socket.SO_REUSEADDR,
+            1
+        )
+
+        server.bind((HOST, PORT))
+        server.listen(1)
+
+        print(f"Aguardando ESP32-CAM na porta {PORT}...")
+
+        conn, address = server.accept()
+        print(f"ESP32-CAM conectada: {address}")
+
+        cv2.namedWindow(janela, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(janela, 800, 600)
+
+        with conn:
+            thread = threading.Thread(
+                target=receiver,
+                args=(conn,),
+                daemon=True
+            )
+            thread.start()
+
+            try:
+                while running:
+                    with latest_lock:
+                        frame = latest_frame
+
+                    if frame is not None:
+                        altura_janela, largura_janela = (
+                            cv2.getWindowImageRect(janela)[3],
+                            cv2.getWindowImageRect(janela)[2]
+                        )
+
+                        if largura_janela > 0 and altura_janela > 0:
+                            altura_original, largura_original = frame.shape[:2]
+
+                            escala = min(
+                                largura_janela / largura_original,
+                                altura_janela / altura_original
+                            )
+
+                            nova_largura = max(
+                                1, int(largura_original * escala)
+                            )
+                            nova_altura = max(
+                                1, int(altura_original * escala)
+                            )
+
+                            imagem = cv2.resize(
+                                frame,
+                                (nova_largura, nova_altura),
+                                interpolation=cv2.INTER_LINEAR
+                            )
+
+                            cv2.imshow(janela, imagem)
+                        else:
+                            cv2.imshow(janela, frame)
+
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        break
+
+            finally:
+                running = False
+                cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()"""
+import socket
+import struct
+import cv2
+import numpy as np
+import threading
+import time
+from datetime import datetime
+
+HOST = "0.0.0.0"
+PORT = 1224
+
+MAX_IMAGE_SIZE = 4_000_000
+RECV_TIMEOUT = 15
+
+DURACAO_MAXIMA = 60       # segundos
+FPS_VIDEO = 15            # quadros gravados por segundo
+
+latest_frame = None
+latest_lock = threading.Lock()
+running = True
+
+
+def receive_exactly(conn, size):
+    data = bytearray()
+
+    while len(data) < size:
+        chunk = conn.recv(size - len(data))
+
+        if not chunk:
+            return None
+
+        data.extend(chunk)
+
+    return data
+
+
+def receiver(conn):
+    global latest_frame, running
+
+    conn.settimeout(RECV_TIMEOUT)
+
+    try:
+        while running:
+            # Recebe o tamanho da imagem: 4 bytes
+            header = receive_exactly(conn, 4)
+
+            if header is None:
+                break
+
+            image_size = struct.unpack("!I", header)[0]
+
+            if not 0 < image_size <= MAX_IMAGE_SIZE:
+                print(f"Tamanho inválido: {image_size}")
+                break
+
+            # Recebe os bytes do JPEG
+            jpeg_data = receive_exactly(conn, image_size)
+
+            if jpeg_data is None:
+                break
+
+            # Decodifica a imagem
+            encoded = np.frombuffer(jpeg_data, dtype=np.uint8)
+            frame = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
+
+            if frame is not None:
+                with latest_lock:
+                    latest_frame = frame
+
+    except (OSError, ValueError) as error:
+        print(f"Erro na recepção: {error}")
+
+    finally:
+        running = False
+
+
+def main():
+    global running
+
+    running = True
+
+    janela = "ESP32-CAM - TCP"
+    writer = None
+    inicio_gravacao = None
+    proximo_frame = 0
+
+    intervalo = 1.0 / FPS_VIDEO
+
+    nome_arquivo = (
+        "gravacao_"
+        + datetime.now().strftime("%Y%m%d_%H%M%S")
+        + ".mp4"
+    )
+
+    try:
+        with socket.socket(
+            socket.AF_INET, socket.SOCK_STREAM
+        ) as server:
+
+            server.setsockopt(
+                socket.SOL_SOCKET,
+                socket.SO_REUSEADDR,
+                1
+            )
+
+            server.bind((HOST, PORT))
+            server.listen(1)
+
+            print(f"Aguardando ESP32-CAM na porta {PORT}...")
+
+            conn, address = server.accept()
+            print(f"ESP32-CAM conectada: {address}")
+
+            cv2.namedWindow(janela, cv2.WINDOW_NORMAL)
+            cv2.resizeWindow(janela, 800, 600)
+
+            with conn:
+                thread = threading.Thread(
+                    target=receiver,
+                    args=(conn,),
+                    daemon=True
+                )
+                thread.start()
+
+                while running:
+                    agora = time.monotonic()
+
+                    with latest_lock:
+                        frame = (
+                            latest_frame.copy()
+                            if latest_frame is not None
+                            else None
+                        )
+
+                    if frame is not None:
+
+                        # Inicializa a gravação no primeiro frame
+                        if writer is None:
+                            altura, largura = frame.shape[:2]
+
+                            codec = cv2.VideoWriter_fourcc(
+                                *"mp4v"
+                            )
+
+                            writer = cv2.VideoWriter(
+                                nome_arquivo,
+                                codec,
+                                FPS_VIDEO,
+                                (largura, altura)
+                            )
+
+                            if not writer.isOpened():
+                                print(
+                                    "Erro ao criar o arquivo de vídeo."
+                                )
+                                break
+
+                            inicio_gravacao = agora
+                            proximo_frame = agora
+
+                            print(
+                                f"Gravando: {nome_arquivo}"
+                            )
+                            print(
+                                f"Duração máxima: "
+                                f"{DURACAO_MAXIMA} segundos"
+                            )
+
+                        tempo_decorrido = (
+                            agora - inicio_gravacao
+                        )
+
+                        # Grava no máximo durante 60 segundos
+                        if tempo_decorrido >= DURACAO_MAXIMA:
+                            print("Tempo máximo atingido.")
+                            break
+
+                        # Grava a uma taxa fixa de 15 FPS.
+                        # Se necessário, repete o último frame recebido.
+                        if agora >= proximo_frame:
+                            writer.write(frame)
+                            proximo_frame += intervalo
+
+                            # Evita tentar recuperar muitos quadros
+                            # de uma só vez se o programa atrasar.
+                            if proximo_frame < agora - intervalo:
+                                proximo_frame = agora + intervalo
+
+                        # Mostra a imagem na janela
+                        visualizacao = cv2.resize(
+                            frame,
+                            (800, 600),
+                            interpolation=cv2.INTER_AREA
+                        )
+
+                        cv2.imshow(janela, visualizacao)
+
+                    if cv2.waitKey(1) & 0xFF == ord("q"):
+                        print("Gravação interrompida pelo usuário.")
+                        break
+
+    except OSError as error:
+        print(f"Erro de conexão ou socket: {error}")
+
+    finally:
+        running = False
+
+        if writer is not None:
+            writer.release()
+            print(f"Vídeo salvo em: {nome_arquivo}")
+
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
+
