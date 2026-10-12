@@ -5,7 +5,7 @@
 #include <WiFiClient.h>
 
 // Endereço do computador que executa o Python
-IPAddress serverIP(192, 168, 1, 57);
+IPAddress serverIP(192, 168, 1, 57);// Ip do pc
 const uint16_t serverPort = 1224;
 
 WiFiClient tcpClient;
@@ -18,13 +18,11 @@ bool writeAll(WiFiClient &client, const uint8_t *data, size_t len) {
     if (!client.connected()) {
       return false;
     }
-
     size_t n = client.write(data + sent, len - sent);
 
     if (n == 0) {
       return false;
     }
-
     sent += n;
   }
 
@@ -75,6 +73,7 @@ void setup() {
   config.jpeg_quality = 12;
   config.fb_count = 2;
 
+  //--------------------------------------------
   if (config.pixel_format == PIXFORMAT_JPEG) {
     if (psramFound()) {
       config.jpeg_quality = 12;
@@ -99,7 +98,6 @@ void setup() {
     Serial.printf("Camera init failed with error 0x%x\n", err);
     return;
   }
-
   sensor_t *s = esp_camera_sensor_get();
 
 #if defined(CAMERA_MODEL_M5STACK_WIDE) || \
@@ -164,14 +162,12 @@ void loop() {
 
   // Cabeçalho de 4 bytes com o tamanho da imagem em big-endian
   uint32_t len = fb->len;
-
   uint8_t header[4] = {
     (uint8_t)(len >> 24),
     (uint8_t)(len >> 16),
     (uint8_t)(len >> 8),
     (uint8_t)len
   };
-
   // Envia primeiro o cabeçalho e depois a imagem
   bool ok = writeAll(tcpClient, header, sizeof(header));
 
@@ -181,7 +177,6 @@ void loop() {
 
   // Libera o buffer da câmera
   esp_camera_fb_return(fb);
-
   if (!ok) {
     Serial.println("Falha na transmissão do frame.");
     tcpClient.stop();
