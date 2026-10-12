@@ -32,8 +32,8 @@ bool writeAll(WiFiClient &client, const uint8_t *data, size_t len) {
 // Modelo da câmera
 #include "board_config_02.h"
 
-const char *ssid = "CTS- RODRIGUES";
-const char *password = "148281re";
+const char *ssid = "********";
+const char *password = "********";
 
 void setup() {
   Serial.begin(115200);
@@ -110,7 +110,7 @@ void setup() {
   s->set_vflip(s, 1);
 #endif
 
-  // Conecta ao Wi-Fi
+  // conection WIFI
   WiFi.begin(ssid, password);
   WiFi.setSleep(false);
 
@@ -152,7 +152,7 @@ void loop() {
   }
 
   // Captura um frame JPEG
-  camera_fb_t *fb = esp_camera_fb_get();
+  camera_fb_t *fb = esp_camera_fb_get();//da biblioteca esp_camera
 
   if (fb == nullptr) {
     Serial.println("Falha na captura da câmera.");
@@ -160,7 +160,7 @@ void loop() {
     return;
   }
 
-  // Cabeçalho de 4 bytes com o tamanho da imagem em big-endian
+  // 4 bytes com o tamanho da imagem em big-endian, com protocolo
   uint32_t len = fb->len;
   uint8_t header[4] = {
     (uint8_t)(len >> 24),
